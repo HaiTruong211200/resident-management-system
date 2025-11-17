@@ -6,7 +6,7 @@ export async function register({name, email, password}) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Registration failed');
-  return data;  // { user, token }
+  return data;  // { account, token }
 }
 
 export async function login({email, password}) {
@@ -17,7 +17,7 @@ export async function login({email, password}) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Login failed');
-  return data;  // { user, token }
+  return data;  // { account, token }
 }
 
 export async function me(token) {
@@ -26,5 +26,5 @@ export async function me(token) {
   });
   if (res.status === 401) return null;
   const data = await res.json();
-  return data.user;
+  return data.account;
 }

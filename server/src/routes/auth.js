@@ -1,13 +1,13 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const {body, validationResult} = require('express-validator');
-const {User} = require('../models/User');
+const Account = require('../models/Account');
 
 const router = express.Router();
 
-function signToken(user) {
+function signToken(account) {
   return jwt.sign(
-      {sub: user._id.toString(), role: user.role}, process.env.JWT_SECRET,
+      {sub: account._id.toString(), role: account.role}, process.env.JWT_SECRET,
       {expiresIn: process.env.JWT_EXPIRES_IN || '7d'});
 }
 
@@ -35,17 +35,19 @@ router.post(
         return res.status(400).json({errors: errors.array()});
 
       const {name, email, password} = req.body;
-      const exists = await User.findOne({email});
+      const exists = await Account.findOne({email});
       if (exists)
         return res.status(409).json({message: 'Email already in use'});
 
       try {
-        const user = await User.create({name, email, password});
-        const token = signToken(user);
+        // create account: map incoming fields to Account schema
+        const account =
+            await Account.create({user_name: name, email, pass: password});
+        const token = signToken(account);
         return res.status(201).json({
-          user: user.toJSON(),
+          account: account.toJSON(),
           token,
-          accessToken: token,  // added for client compatibility
+          accessToken: token,
           expiresIn: process.env.JWT_EXPIRES_IN || '7d',
         });
       } catch (err) {
@@ -74,17 +76,18 @@ router.post(
         return res.status(400).json({errors: errors.array()});
 
       const {email, password} = req.body;
-      const user = await User.findOne({email}).select('+password');
-      if (!user) return res.status(401).json({message: 'Invalid credentials'});
+      const account = await Account.findOne({email}).select('+pass');
+      if (!account)
+        return res.status(401).json({message: 'Invalid credentials'});
 
-      const match = await user.comparePassword(password);
+      const match = await account.comparePassword(password);
       if (!match) return res.status(401).json({message: 'Invalid credentials'});
 
-      const token = signToken(user);
+      const token = signToken(account);
       return res.json({
-        user: user.toJSON(),
+        account: account.toJSON(),
         token,
-        accessToken: token,  // added for client compatibility
+        accessToken: token,
         expiresIn: process.env.JWT_EXPIRES_IN || '7d',
       });
     });

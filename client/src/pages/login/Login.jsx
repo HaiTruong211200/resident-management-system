@@ -21,7 +21,7 @@ function Login() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("alice@example.com");
   const [password, setPassword] = useState("Password123");
-  const [user, setUser] = useState(null);
+  const [account, setAccount] = useState(null);
 
   const navigate = useNavigate();
 
@@ -36,12 +36,12 @@ function Login() {
         ? register({ name, email, password })
         : login({ email, password });
 
-      const { user, token } = await action;
+      const { account: serverAccount, token } = await action;
       localStorage.setItem("token", token);
-      setUser(user);
+      setAccount(serverAccount);
       toast.success(isRegister ? "Registered" : "Logged in");
       const profile = await me(token);
-      if (profile) setUser(profile);
+      if (profile) setAccount(profile);
     } catch (err) {
       toast.error(err.message);
     }
@@ -49,7 +49,7 @@ function Login() {
 
   const onLogout = () => {
     localStorage.removeItem("token");
-    setUser(null);
+    setAccount(null);
   };
 
   return (

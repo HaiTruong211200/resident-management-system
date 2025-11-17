@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const {User} = require('../models/User');
+const Account = require('../models/Account');
 
 async function auth(req, res, next) {
   try {
@@ -9,10 +9,10 @@ async function auth(req, res, next) {
       return res.status(401).json({message: 'Unauthorized'});
 
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(payload.sub).select('-password');
-    if (!user) return res.status(401).json({message: 'Unauthorized'});
+    const account = await Account.findById(payload.sub).select('-pass');
+    if (!account) return res.status(401).json({message: 'Unauthorized'});
 
-    req.user = user;
+    req.account = account;
     next();
   } catch {
     return res.status(401).json({message: 'Unauthorized'});

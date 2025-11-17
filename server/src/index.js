@@ -8,6 +8,9 @@ require('dotenv').config();
 const {connectDB} = require('./config/db');
 const {router: authRoutes} = require('./routes/auth');
 const {auth} = require('./middleware/auth');
+const residentsRoutes = require('./routes/residents');
+const householdsRoutes = require('./routes/households');
+const feesRoutes = require('./routes/fees');
 
 const app = express();
 
@@ -30,19 +33,24 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
   const limiter = rateLimit({windowMs: 15 * 60 * 1000, max: 300});
   app.use('/api/', limiter);
-  app.use('/auth', limiter);  // apply limiter to alias as well
+  app.use('/auth', limiter);
 
   app.get('/api/health', (_req, res) => res.json({ok: true}));
 
   app.use('/api/auth', authRoutes);
-  app.use('/auth', authRoutes);  // alias routes without /api prefix
+  app.use('/auth', authRoutes);
+
+  // Resource routes
+  app.use('/api/residents', residentsRoutes);
+  app.use('/api/households', householdsRoutes);
+  app.use('/api/fees', feesRoutes);
 
   // Protected routes
   app.get('/api/me', auth, (req, res) => {
-    res.json({user: req.user});
+    res.json({account: req.account});
   });
-  app.get('/me', auth, (req, res) => {  // alias without /api prefix
-    res.json({user: req.user});
+  app.get('/me', auth, (req, res) => {
+    res.json({account: req.account});
   });
 
   // 404
