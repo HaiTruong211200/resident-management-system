@@ -47,5 +47,6 @@ tmp/
 temp/
 uploads/
 
-# Mongo dumps
-dump/
+server/db
+server/postman
+server/scripts

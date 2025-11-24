@@ -1,13 +1,15 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const {body, validationResult} = require('express-validator');
-const Account = require('../models/Account');
+const {createAccount, findByEmail, comparePassword} =
+    require('../models/Account');
+const {sendSuccess, sendError, validationFailed} = require('../utils/response');
 
 const router = express.Router();
 
 function signToken(account) {
   return jwt.sign(
-      {sub: account._id.toString(), role: account.role}, process.env.JWT_SECRET,
+      {sub: account.id, role: account.role}, process.env.JWT_SECRET,
       {expiresIn: process.env.JWT_EXPIRES_IN || '7d'});
 }
 
@@ -31,30 +33,39 @@ router.post(
     ],
     async (req, res) => {
       const errors = validationResult(req);
-      if (!errors.isEmpty())
-        return res.status(400).json({errors: errors.array()});
+      if (!errors.isEmpty()) return validationFailed(res, errors.array());
 
       const {name, email, password} = req.body;
-      const exists = await Account.findOne({email});
-      if (exists)
-        return res.status(409).json({message: 'Email already in use'});
-
       try {
-        // create account: map incoming fields to Account schema
+        const exists = await findByEmail(email);
+        if (exists)
+          return sendError(res, {
+            status: 409,
+            message: 'Email already in use',
+            code: 'EMAIL_IN_USE'
+          });
+
         const account =
-            await Account.create({user_name: name, email, pass: password});
+            await createAccount({user_name: name, email, pass: password});
         const token = signToken(account);
-        return res.status(201).json({
-          account: account.toJSON(),
-          token,
-          accessToken: token,
-          expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-        });
+        return sendSuccess(
+            res, {
+              account,
+              token,
+              accessToken: token,
+              expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+            },
+            {status: 201});
       } catch (err) {
-        if (err && err.code === 11000) {
-          return res.status(409).json({message: 'Email already in use'});
+        if (err && err.code === '23505') {
+          return sendError(res, {
+            status: 409,
+            message: 'Email or username already in use',
+            code: 'UNIQUE_CONSTRAINT'
+          });
         }
-        throw err;
+        console.error(err);
+        return sendError(res);
       }
     });
 
@@ -72,24 +83,38 @@ router.post(
     ],
     async (req, res) => {
       const errors = validationResult(req);
-      if (!errors.isEmpty())
-        return res.status(400).json({errors: errors.array()});
+      if (!errors.isEmpty()) return validationFailed(res, errors.array());
 
       const {email, password} = req.body;
-      const account = await Account.findOne({email}).select('+pass');
-      if (!account)
-        return res.status(401).json({message: 'Invalid credentials'});
+      try {
+        const account = await findByEmail(email, true);
+        if (!account)
+          return sendError(res, {
+            status: 401,
+            message: 'Invalid credentials',
+            code: 'INVALID_CREDENTIALS'
+          });
 
-      const match = await account.comparePassword(password);
-      if (!match) return res.status(401).json({message: 'Invalid credentials'});
+        const match = await comparePassword(password, account.pass);
+        if (!match)
+          return sendError(res, {
+            status: 401,
+            message: 'Invalid credentials',
+            code: 'INVALID_CREDENTIALS'
+          });
 
-      const token = signToken(account);
-      return res.json({
-        account: account.toJSON(),
-        token,
-        accessToken: token,
-        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-      });
+        delete account.pass;
+        const token = signToken(account);
+        return sendSuccess(res, {
+          account,
+          token,
+          accessToken: token,
+          expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+        });
+      } catch (err) {
+        console.error(err);
+        return sendError(res);
+      }
     });
 
 module.exports = {router};

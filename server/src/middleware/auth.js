@@ -1,21 +1,37 @@
 const jwt = require('jsonwebtoken');
-const Account = require('../models/Account');
+const {findById} = require('../models/Account');
+const {sendError} = require('../utils/response');
 
 async function auth(req, res, next) {
   try {
     const header = req.headers.authorization || '';
     const [scheme, token] = header.split(' ');
-    if (scheme !== 'Bearer' || !token)
-      return res.status(401).json({message: 'Unauthorized'});
+    if (scheme !== 'Bearer' || !token) {
+      return sendError(
+          res, {status: 401, message: 'Unauthorized', code: 'UNAUTHORIZED'});
+    }
 
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const account = await Account.findById(payload.sub).select('-pass');
-    if (!account) return res.status(401).json({message: 'Unauthorized'});
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (e) {
+      return sendError(
+          res, {status: 401, message: 'Invalid token', code: 'INVALID_TOKEN'});
+    }
+
+    const account = await findById(payload.sub);
+    if (!account) {
+      return sendError(
+          res, {status: 401, message: 'Unauthorized', code: 'UNAUTHORIZED'});
+    }
 
     req.account = account;
-    next();
-  } catch {
-    return res.status(401).json({message: 'Unauthorized'});
+    return next();
+  } catch (err) {
+    console.error('Auth middleware error', err);
+    return sendError(
+        res,
+        {status: 500, message: 'Auth processing failed', code: 'AUTH_ERROR'});
   }
 }
 

@@ -1,27 +1,43 @@
-const mongoose = require('mongoose');
-const {Schema} = mongoose;
+const {getSupabase} = require('../config/db');
+// ERD-aligned DAO. Table: household_payments with int PK payment_id
 
-const HouseholdPaymentSchema = new Schema(
-    {
-      household: {
-        type: Schema.Types.ObjectId,
-        ref: 'Household',
-        required: true,
-        index: true
-      },
-      payment_type: {
-        type: Schema.Types.ObjectId,
-        ref: 'PaymentType',
-        required: true,
-        index: true
-      },
-      amount_paid: {type: Number, required: true, min: 0},
-      payment_date: {type: Date, required: true, default: Date.now},
-      notes: {type: String, default: null, trim: true},
-    },
-    {timestamps: true});
+async function create(payload) {
+  const supabase = getSupabase();
+  const {data, error} = await supabase.from('household_payments')
+                            .insert(payload)
+                            .select('*')
+                            .single();
+  if (error) throw error;
+  return data;
+}
 
-HouseholdPaymentSchema.index({household: 1, payment_date: -1});
+async function deleteMany() {
+  const supabase = getSupabase();
+  const {error} =
+      await supabase.from('household_payments').delete().not('id', 'is', null);
+  if (error) throw error;
+}
 
-module.exports = mongoose.models.HouseholdPayment ||
-    mongoose.model('HouseholdPayment', HouseholdPaymentSchema);
+async function list() {
+  const supabase = getSupabase();
+  const {data, error} = await supabase.from('household_payments').select('*');
+  if (error) throw error;
+  return data || [];
+}
+
+async function findById(id) {
+  const supabase = getSupabase();
+  const {data, error} = await supabase.from('household_payments')
+                            .select('*')
+                            .eq('payment_id', id)
+                            .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+module.exports = {
+  create,
+  deleteMany,
+  list,
+  findById
+};

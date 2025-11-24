@@ -5,12 +5,13 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-const {connectDB} = require('./config/db');
+const {initSupabase} = require('./config/db');
 const {router: authRoutes} = require('./routes/auth');
 const {auth} = require('./middleware/auth');
 const residentsRoutes = require('./routes/residents');
 const householdsRoutes = require('./routes/households');
-const feesRoutes = require('./routes/fees');
+const paymentTypesRoutes = require('./routes/paymentTypes');
+const householdPaymentsRoutes = require('./routes/householdPayments');
 
 const app = express();
 
@@ -19,9 +20,12 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 (async () => {
   try {
-    await connectDB(process.env.MONGODB_URI);
+    // Initialize Supabase client
+    initSupabase(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY);
   } catch (err) {
-    console.error('MongoDB connection failed:', err);
+    console.error('Supabase init failed:', err);
     process.exit(1);
   }
 
@@ -37,29 +41,33 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
   app.get('/api/health', (_req, res) => res.json({ok: true}));
 
+  // Auth routes (single canonical mount)
   app.use('/api/auth', authRoutes);
-  app.use('/auth', authRoutes);
 
   // Resource routes
   app.use('/api/residents', residentsRoutes);
   app.use('/api/households', householdsRoutes);
-  app.use('/api/fees', feesRoutes);
+  // ERD-aligned routes replacing previous fees feature
+  app.use('/api/payment-types', paymentTypesRoutes);
+  app.use('/api/household-payments', householdPaymentsRoutes);
 
-  // Protected routes
+  // Protected route
   app.get('/api/me', auth, (req, res) => {
-    res.json({account: req.account});
-  });
-  app.get('/me', auth, (req, res) => {
-    res.json({account: req.account});
+    const {sendSuccess} = require('./utils/response');
+    return sendSuccess(res, {account: req.account});
   });
 
-  // 404
-  app.use((req, res) => res.status(404).json({message: 'Not found'}));
+  const {sendError} = require('./utils/response');
+  // 404 handler
+  app.use(
+      (req, res) => sendError(
+          res, {status: 404, message: 'Not found', code: 'NOT_FOUND'}));
 
-  // Error handler
+  // Central error handler
   app.use((err, _req, res, _next) => {
-    console.error(err);
-    res.status(500).json({message: 'Server error'});
+    console.error('Unhandled error:', err);
+    if (res.headersSent) return;
+    sendError(res);
   });
 
   app.listen(PORT, () => {

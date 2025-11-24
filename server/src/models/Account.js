@@ -1,44 +1,58 @@
-const mongoose = require('mongoose');
+const {getSupabase} = require('../config/db');
 const bcrypt = require('bcryptjs');
-const {Schema} = mongoose;
+// Pure Supabase DAO implementation (mongoose removed)
+// Table: accounts (id uuid pk, user_name unique, email unique, pass hashed,
+// role)
 
-const ROLES = ['admin', 'staff', 'user'];
-
-const AccountSchema = new Schema(
-    {
-      user_name:
-          {type: String, required: true, unique: true, trim: true, index: true},
-      pass: {type: String, required: true},
-      role: {type: String, enum: ROLES, default: 'user'},
-      email: {
-        type: String,
-        required: true,
-        unique: true,
-        trim: true,
-        lowercase: true,
-        index: true
-      },
-      refreshToken: {type: String, default: null},
-    },
-    {timestamps: true});
-
-AccountSchema.pre('save', async function(next) {
-  if (!this.isModified('pass')) return next();
+async function createAccount({user_name, email, pass, role = 'user'}) {
   const salt = await bcrypt.genSalt(10);
-  this.pass = await bcrypt.hash(this.pass, salt);
-  next();
-});
+  const hash = await bcrypt.hash(pass, salt);
+  const supabase = getSupabase();
+  const {data, error} = await supabase.from('accounts')
+                            .insert({user_name, email, pass: hash, role})
+                            .select('id, user_name, email, role')
+                            .single();
+  if (error) throw error;
+  return data;
+}
 
-AccountSchema.methods.comparePassword = function(candidate) {
-  return bcrypt.compare(candidate, this.pass);
+async function findByEmail(email, withPassword = false) {
+  const supabase = getSupabase();
+  const cols = withPassword ? 'id, user_name, email, pass, role' :
+                              'id, user_name, email, role';
+  const {data, error} = await supabase.from('accounts')
+                            .select(cols)
+                            .eq('email', email)
+                            .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+async function findById(id, withPassword = false) {
+  const supabase = getSupabase();
+  const cols = withPassword ? 'id, user_name, email, pass, role' :
+                              'id, user_name, email, role';
+  const {data, error} =
+      await supabase.from('accounts').select(cols).eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+async function comparePassword(candidate, hash) {
+  return bcrypt.compare(candidate, hash);
+}
+
+async function deleteMany() {
+  const supabase = getSupabase();
+  const {error} =
+      await supabase.from('accounts').delete().not('id', 'is', null);
+  if (error) throw error;
+}
+
+module.exports = {
+  createAccount,
+  findByEmail,
+  findById,
+  comparePassword,
+  deleteMany
 };
-
-// Remove sensitive fields when converting to JSON
-AccountSchema.methods.toJSON = function() {
-  const obj = this.toObject({versionKey: false});
-  delete obj.pass;
-  return obj;
-};
-
-module.exports =
-    mongoose.models.Account || mongoose.model('Account', AccountSchema);

@@ -1,27 +1,41 @@
-const mongoose = require('mongoose');
-const {Schema} = mongoose;
+const {getSupabase} = require('../config/db');
+// ERD-aligned DAO. Table: payment_types (int PK as payment_type_id)
 
-const PAYMENT_TYPES = ['one_time', 'recurring', 'fee'];
+async function create(payload) {
+  const supabase = getSupabase();
+  const {data, error} =
+      await supabase.from('payment_types').insert(payload).select('*').single();
+  if (error) throw error;
+  return data;
+}
 
-const PaymentTypeSchema = new Schema(
-    {
-      name: {type: String, required: true, trim: true},
-      pass: {
-        type: String,
-        trim: true
-      },  // optional code or pass-through field from ERD
-      type: {
-        type: String,
-        enum: PAYMENT_TYPES,
-        required: true,
-        default: 'one_time'
-      },
-      amount_per_person: {type: Number, default: null},
-      date_created: {type: Date, default: Date.now},
-    },
-    {timestamps: true});
+async function deleteMany() {
+  const supabase = getSupabase();
+  const {error} =
+      await supabase.from('payment_types').delete().not('id', 'is', null);
+  if (error) throw error;
+}
 
-PaymentTypeSchema.index({name: 1}, {unique: true, sparse: true});
+async function list() {
+  const supabase = getSupabase();
+  const {data, error} = await supabase.from('payment_types').select('*');
+  if (error) throw error;
+  return data || [];
+}
 
-module.exports = mongoose.models.PaymentType ||
-    mongoose.model('PaymentType', PaymentTypeSchema);
+async function findById(id) {
+  const supabase = getSupabase();
+  const {data, error} = await supabase.from('payment_types')
+                            .select('*')
+                            .eq('payment_type_id', id)
+                            .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+module.exports = {
+  create,
+  deleteMany,
+  list,
+  findById
+};

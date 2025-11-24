@@ -8,13 +8,14 @@ router.post(
     '/',
     [
       body('house_number').optional().isInt().toInt(),
-      body('street').optional().isString(),
+      body('street').optional().isInt().toInt(),
+      body('ward').optional().isInt().toInt(),
+      body('district').optional().isInt().toInt(),
+      body('household_head_id').optional().isInt().toInt(),
     ],
-    householdController.createHousehold,
-);
+    householdController.createHousehold);
 
-router.put(
-    '/:id', [param('id').isMongoId()], householdController.updateHousehold);
+router.put('/:id', [param('id').isInt()], householdController.updateHousehold);
 
 router.get(
     '/search', [query('keyword').optional().isString()],

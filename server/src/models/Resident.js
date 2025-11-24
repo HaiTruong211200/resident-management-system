@@ -1,39 +1,58 @@
-const mongoose = require('mongoose');
-const {Schema} = mongoose;
+const {getSupabase} = require('../config/db');
+// ERD-aligned Supabase DAO. Table `residents` uses int PKs and snake_case.
+// Columns include many demographic fields per ERD. FK: household_id ->
+// households.id (int)
 
-const GENDERS = ['male', 'female', 'other'];
+async function createResident(payload) {
+  const supabase = getSupabase();
+  const {data, error} =
+      await supabase.from('residents').insert(payload).select('*').single();
+  if (error) throw error;
+  return data;
+}
 
-const ResidentSchema = new Schema(
-    {
-      household: {
-        type: Schema.Types.ObjectId,
-        ref: 'Household',
-        required: true,
-        index: true
-      },
-      full_name: {type: String, required: true, trim: true},
-      date_of_birth: {type: Date, required: true},
-      gender: {type: String, enum: GENDERS, required: true},
-      place_of_birth: {type: String, trim: true},
-      hometown: {type: String, trim: true},
-      ethnicity: {type: String, trim: true},
-      occupation: {type: String, trim: true},
-      workplace: {type: String, trim: true},
-      id_card_number:
-          {type: String, required: true, unique: true, index: true, trim: true},
-      id_card_issue_place: {type: String, trim: true},
-      id_card_issue_date: {type: Date},
-      residence_registration_date: {type: Date},
-      previous_address: {type: String, trim: true},
-      relationship_to_head: {type: String, trim: true},
-    },
-    {
-      timestamps: true,
-      toJSON: {virtuals: true},
-      toObject: {virtuals: true},
-    });
+async function updateResident(id, payload) {
+  const supabase = getSupabase();
+  const {data, error} = await supabase.from('residents')
+                            .update(payload)
+                            .eq('id', id)
+                            .select('*')
+                            .single();
+  if (error) throw error;
+  return data;
+}
 
-ResidentSchema.index({household: 1, full_name: 1});
+async function findById(id) {
+  const supabase = getSupabase();
+  const {data, error} =
+      await supabase.from('residents').select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
 
-module.exports =
-    mongoose.models.Resident || mongoose.model('Resident', ResidentSchema);
+async function searchResidents(keyword) {
+  const supabase = getSupabase();
+  const isInt = /^\d+$/.test(String(keyword));
+  const orParts =
+      [`full_name.ilike.%${keyword}%`, `id_card_number.ilike.%${keyword}%`];
+  if (isInt) orParts.push(`household_id.eq.${Number(keyword)}`);
+  const {data, error} =
+      await supabase.from('residents').select('*').or(orParts.join(','));
+  if (error) throw error;
+  return data || [];
+}
+
+async function deleteMany() {
+  const supabase = getSupabase();
+  const {error} =
+      await supabase.from('residents').delete().not('id', 'is', null);
+  if (error) throw error;
+}
+
+module.exports = {
+  createResident,
+  updateResident,
+  findById,
+  searchResidents,
+  deleteMany
+};
