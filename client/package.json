@@ -12,16 +12,18 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
     "axios": "^1.12.2",
+    "lucide-react": "^0.554.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.9.3",
+    "recharts": "^3.5.0",
     "toast": "^0.5.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
-    "@types/react": "^19.1.16",
-    "@types/react-dom": "^19.1.9",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.36.0",
@@ -31,6 +33,7 @@
     "postcss": "^8.5.6",
     "sass-embedded": "^1.93.2",
     "tailwindcss": "^4.1.14",
+    "typescript": "^5.9.3",
     "vite": "^7.1.7"
   }
 }
