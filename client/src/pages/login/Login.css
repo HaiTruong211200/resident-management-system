@@ -129,11 +129,13 @@
 }
 
 @keyframes move {
+
   0%,
   49.99% {
     opacity: 0;
     z-index: 1;
   }
+
   50%,
   100% {
     opacity: 1;
@@ -231,16 +233,22 @@
 
 /* Hiệu ứng hover cho nút bình thường */
 .btn-tdn:hover {
-  background-color: #16325b; /* Màu nền thay đổi khi hover */
-  color: #ffffff; /* Giữ màu chữ */
-  transform: scale(1.05); /* Phóng to 5% */
+  background-color: #16325b;
+  /* Màu nền thay đổi khi hover */
+  color: #ffffff;
+  /* Giữ màu chữ */
+  transform: scale(1.05);
+  /* Phóng to 5% */
 }
 
 /* Hiệu ứng hover cho nút ẩn */
 .btn-tdn-2:hover {
-  background-color: rgba(255, 255, 255, 0.1); /* Thêm nền mờ trắng khi hover */
-  border-color: #fff; /* Giữ màu viền */
-  color: #fff; /* Giữ màu chữ */
+  background-color: rgba(255, 255, 255, 0.1);
+  /* Thêm nền mờ trắng khi hover */
+  border-color: #fff;
+  /* Giữ màu viền */
+  color: #fff;
+  /* Giữ màu chữ */
 }
 
 .error {
