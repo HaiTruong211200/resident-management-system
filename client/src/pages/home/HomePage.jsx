@@ -68,18 +68,18 @@ export default function HomePage() {
                 <div className="relative w-[500px] h-[500px]">
 
                     {/* Large Circle */}
-                    <div className="absolute left-6 top-6 w-[420px] h-[420px] rounded-full bg-white flex justify-center items-center shadow-xl">
-                        <img src="/Picture_Resident.png" alt="main" className="w-[300px]" />
+                    <div className="absolute left-6 top-6 w-[420px] h-[420px] rounded-full bg-white flex justify-center items-center shadow-xl overflow-hidden">
+                        <img src="/Picture_Resident.png" alt="main" className="w-full h-full object-cover" />
                     </div>
 
                     {/* Top Small Circle */}
-                    <div className="absolute right-[-40px] top-[-20px] w-[150px] h-[150px] bg-white rounded-full flex justify-center items-center shadow-xl">
-                        <img src="/ChungCu.png" alt="chart1" className="w-[80px]" />
+                    <div className="absolute right-[-60px] top-[-20px] w-[150px] h-[150px] bg-white rounded-full flex justify-center items-center shadow-xl overflow-hidden">
+                        <img src="/TronTren.png" alt="chart1" className="w-full h-full object-cover" />
                     </div>
 
                     {/* Bottom Small Circle */}
-                    <div className="absolute right-[-70px] bottom-[0px] w-[160px] h-[160px] bg-white rounded-full flex justify-center items-center shadow-xl">
-                        <img src="/TronDUoi.png" alt="chart2" className="w-[90px]" />
+                    <div className="absolute right-[-70px] bottom-[0px] w-[160px] h-[160px] bg-white rounded-full flex justify-center items-center shadow-xl overflow-hidden">
+                        <img src="/TronDuoi.png" alt="chart2" className="w-full h-full object-cover" />
                     </div>
 
                 </div>
