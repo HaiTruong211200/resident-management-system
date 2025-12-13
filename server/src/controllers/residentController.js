@@ -1,12 +1,17 @@
-const {validationResult} = require('express-validator');
+const { validationResult } = require("express-validator");
 const {
   createResident,
   updateResident,
   searchResidents,
-  findById: findResidentById
-} = require('../models/Resident');
-const {findById: findHouseholdById} = require('../models/Household');
-const {sendSuccess, sendError, validationFailed} = require('../utils/response');
+  findById: findResidentById,
+  getAllResidents,
+} = require("../models/Resident");
+const { findById: findHouseholdById } = require("../models/Household");
+const {
+  sendSuccess,
+  sendError,
+  validationFailed,
+} = require("../utils/response");
 
 async function createResidentHandler(req, res) {
   const errors = validationResult(req);
@@ -15,25 +20,25 @@ async function createResidentHandler(req, res) {
   try {
     const payload = req.body;
 
-    if (payload.household_id) {
-      const household = await findHouseholdById(payload.household_id);
+    if (payload.householdId) {
+      const household = await findHouseholdById(payload.householdId);
       if (!household)
         return sendError(res, {
           status: 404,
-          message: 'Household not found',
-          code: 'HOUSEHOLD_NOT_FOUND'
+          message: "Household not found",
+          code: "HOUSEHOLD_NOT_FOUND",
         });
     }
 
     const resident = await createResident(payload);
-    return sendSuccess(res, {resident}, {status: 201});
+    return sendSuccess(res, { resident }, { status: 201 });
   } catch (err) {
-    if (err.code === '23505')
-      return sendError(res, {
-        status: 409,
-        message: 'Duplicate id_card_number',
-        code: 'DUPLICATE_ID_CARD'
-      });
+    if (err.code === "23505") console.log(err);
+    return sendError(res, {
+      status: 409,
+      message: "Duplicate id_card_number",
+      code: "DUPLICATE_ID_CARD",
+    });
     console.error(err);
     return sendError(res);
   }
@@ -47,13 +52,13 @@ async function updateResidentHandler(req, res) {
   try {
     const payload = req.body;
 
-    if (payload.household_id) {
-      const household = await findHouseholdById(payload.household_id);
+    if (payload.householdId) {
+      const household = await findHouseholdById(payload.householdId);
       if (!household)
         return sendError(res, {
           status: 400,
-          message: 'Invalid household id',
-          code: 'INVALID_HOUSEHOLD'
+          message: "Invalid household id",
+          code: "INVALID_HOUSEHOLD",
         });
     }
 
@@ -61,10 +66,10 @@ async function updateResidentHandler(req, res) {
     if (!resident)
       return sendError(res, {
         status: 404,
-        message: 'Resident not found',
-        code: 'RESIDENT_NOT_FOUND'
+        message: "Resident not found",
+        code: "RESIDENT_NOT_FOUND",
       });
-    return sendSuccess(res, {resident});
+    return sendSuccess(res, { resident });
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -73,16 +78,46 @@ async function updateResidentHandler(req, res) {
 
 async function searchResidentsHandler(req, res) {
   try {
-    const keyword = (req.query.keyword || '').trim();
+    const keyword = (req.query.keyword || "").trim();
     if (!keyword)
       return sendError(res, {
         status: 400,
-        message: 'keyword query is required',
-        code: 'MISSING_KEYWORD'
+        message: "keyword query is required",
+        code: "MISSING_KEYWORD",
       });
 
     const results = await searchResidents(keyword);
-    return sendSuccess(res, {results});
+    return sendSuccess(res, { results });
+  } catch (err) {
+    console.error(err);
+    return sendError(res);
+  }
+}
+
+async function getAllResidentsHandler(req, res) {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.max(1, Number(req.query.limit) || 20);
+    const householdId = req.query.householdId
+      ? Number(req.query.householdId)
+      : undefined;
+
+    // Parse optional sorting params
+    const sort_by = req.query.sort_by ? String(req.query.sort_by) : undefined;
+    const order = req.query.order ? String(req.query.order) : undefined;
+
+    const { data, count } = await getAllResidents({
+      page,
+      limit,
+      householdId,
+      sort_by,
+      order,
+    });
+
+    return sendSuccess(res, {
+      residents: data,
+      meta: { total: count, page, limit },
+    });
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -90,7 +125,8 @@ async function searchResidentsHandler(req, res) {
 }
 
 module.exports = {
-  createResident : createResidentHandler,
-  updateResident : updateResidentHandler,
-  searchResidents : searchResidentsHandler
+  createResident: createResidentHandler,
+  updateResident: updateResidentHandler,
+  searchResidents: searchResidentsHandler,
+  getAllResidents: getAllResidentsHandler,
 };

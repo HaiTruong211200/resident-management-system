@@ -1,24 +1,34 @@
-const express = require('express');
-const {body, param, query} = require('express-validator');
+const express = require("express");
+const { body, param, query } = require("express-validator");
 const router = express.Router();
 
-const householdController = require('../controllers/householdController');
+const householdController = require("../controllers/householdController");
 
-router.post(
-    '/',
-    [
-      body('house_number').optional().isInt().toInt(),
-      body('street').optional().isInt().toInt(),
-      body('ward').optional().isInt().toInt(),
-      body('district').optional().isInt().toInt(),
-      body('household_head_id').optional().isInt().toInt(),
-    ],
-    householdController.createHousehold);
-
-router.put('/:id', [param('id').isInt()], householdController.updateHousehold);
-
+// Get all households
 router.get(
-    '/search', [query('keyword').optional().isString()],
-    householdController.searchHouseholds);
+  "/search",
+  [query("keyword").optional().isString()],
+  householdController.searchHouseholds
+);
+router.get("/", householdController.getAllHouseholds);
+
+// router.post(
+//   "/",
+//   [
+//     body("id").optional().isString().toString(),
+//     body("houseNumber").optional().isInt().toInt(),
+//     body("street").optional().isString().toString(),
+//     body("ward").optional().isString().toString(),
+//     body("district").optional().isString().toString(),
+//     body("householdHeadId").optional().isInt().toInt(),
+//   ],
+//   householdController.createHousehold
+// );
+
+router.put(
+  "/:id",
+  [param("id").isString()],
+  householdController.updateHousehold
+);
 
 module.exports = router;
