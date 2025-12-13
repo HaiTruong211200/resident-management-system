@@ -9,6 +9,8 @@ import { LandingPage } from "../components/LandingPage";
 import { LoginPage } from "../pages/auth/LoginPage";
 import { HouseholdPage } from "../pages/household/HouseholdPage";
 import { ResidentPage } from "../pages/resident/ResidentPage";
+import { FeePage } from "../pages/fees/FeePage";
+
 import { Unknown } from "../pages/unknown/Unknown";
 
 export const AppRoutes = () => {
@@ -73,6 +75,7 @@ export const AppRoutes = () => {
           path="residents/:householdId?"
           element={<ResidentPage onBack={handleBack} />}
         />
+        <Route path="fees" element={<FeePage />} />
       </Route>
 
       {/* Redirect unknown routes */}

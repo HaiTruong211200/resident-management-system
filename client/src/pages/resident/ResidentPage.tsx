@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAppContext } from "../../context/AppContext";
 import { Resident, Gender } from "../../types";
 import {
@@ -16,6 +16,45 @@ import {
   Briefcase,
 } from "lucide-react";
 
+const SERVER_URL: string = "http://localhost:4000";
+
+export const relationshipColors: Record<string, string> = {
+  // Trung tâm
+  "Chủ hộ": "bg-purple-100 text-purple-700 border border-purple-200",
+
+  // Vợ / Chồng
+  "Vợ/Chồng": "bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200",
+
+  // Thế hệ trên
+  "Cha/Mẹ": "bg-blue-100 text-blue-700 border border-blue-200",
+  "Ông/Bà": "bg-amber-100 text-amber-700 border border-amber-200",
+
+  // Cùng thế hệ
+  "Anh/Chị/Em": "bg-sky-100 text-sky-700 border border-sky-200",
+
+  // Thế hệ dưới
+  Con: "bg-green-100 text-green-700 border border-green-200",
+  Cháu: "bg-lime-100 text-lime-700 border border-lime-200",
+
+  // Quan hệ xa
+  "Họ hàng": "bg-cyan-100 text-cyan-700 border border-cyan-200",
+
+  // Khác
+  Khác: "bg-slate-100 text-slate-600 border border-slate-200",
+};
+
+export const RELATIONSHIP_OPTIONS = [
+  "Chủ hộ",
+  "Vợ/Chồng",
+  "Con",
+  "Cháu",
+  "Cha/Mẹ",
+  "Ông/Bà",
+  "Anh/Chị/Em",
+  "Họ hàng",
+  "Khác",
+];
+
 interface ResidentPageProps {
   filterHouseholdId?: string | null;
   onBack?: () => void;
@@ -25,8 +64,18 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
   filterHouseholdId,
   onBack,
 }) => {
-  const { residents, households, addResident, editResident, deleteResident } =
+  const { households, addResident, editResident, deleteResident } =
     useAppContext();
+
+  // Pagination / remote data state
+  const [residentsData, setResidentsData] = useState<Resident[]>([]);
+  const [page, setPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(10);
+  const [total, setTotal] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(false);
+  // Client-side sorting
+  const [sortBy, setSortBy] = useState<string>("householdId");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [searchTerm, setSearchTerm] = useState("");
 
   // State for Add/Edit Modal
@@ -37,16 +86,84 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
   // State for View Details Modal
   const [viewingItem, setViewingItem] = useState<Resident | null>(null);
 
-  const filteredResidents = residents.filter((r) => {
+  // Apply client-side sorting then filtering/searching
+  const sortedResidents = [...residentsData].sort((a, b) => {
+    const col = sortBy;
+    const aVal: any = (a as any)[col];
+    const bVal: any = (b as any)[col];
+
+    // Try numeric comparison first
+    const aNum = Number(aVal);
+    const bNum = Number(bVal);
+    if (!Number.isNaN(aNum) && !Number.isNaN(bNum)) {
+      return sortOrder === "asc" ? aNum - bNum : bNum - aNum;
+    }
+
+    // Fallback to locale string compare
+    const aStr = String(aVal || "").toLowerCase();
+    const bStr = String(bVal || "").toLowerCase();
+    if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
+    if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const filteredResidents = sortedResidents.filter((r) => {
     const matchesFilter = filterHouseholdId
       ? r.householdId === filterHouseholdId
       : true;
     const matchesSearch =
       r.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (r.idCardNumber && r.idCardNumber.includes(searchTerm)) ||
-      r.id.toLowerCase().includes(searchTerm.toLowerCase());
+      r.fullName.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  const getRelationshipColor = (relationship: string) => {
+    return relationshipColors[relationship] || "bg-slate-100 text-slate-600";
+  };
+
+  const toggleSort = (col: string) => {
+    if (sortBy === col) setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
+    else {
+      setSortBy(col);
+      setSortOrder("asc");
+    }
+    // Reset to first page when sort changes
+    setPage(1);
+  };
+
+  // Fetch residents from backend when page, limit or household filter changes
+  useEffect(() => {
+    let abort = false;
+    async function fetchResidents() {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("page", String(page));
+        params.set("limit", String(limit));
+        if (filterHouseholdId) params.set("household_id", filterHouseholdId);
+
+        const resp = await fetch(
+          `${SERVER_URL}/api/residents?${params.toString()}`
+        );
+        if (!resp.ok) throw new Error("Failed to fetch residents");
+        const json = await resp.json();
+        if (abort) return;
+        const data = json?.data?.residents || [];
+        const meta = json?.data?.meta || {};
+        setResidentsData(data);
+        setTotal(meta.total || 0);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!abort) setLoading(false);
+      }
+    }
+    fetchResidents();
+    return () => {
+      abort = true;
+    };
+  }, [page, limit, filterHouseholdId]);
 
   const activeHousehold = filterHouseholdId
     ? households.find((h) => h.id === filterHouseholdId)
@@ -59,13 +176,13 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
     } else {
       setEditingItem(null);
       setFormData({
-        id: `R${Date.now()}`, // Internal ID
+        // id: `R${Date.now()}`, // Internal ID
         householdId: filterHouseholdId || households[0]?.id || "",
         ethnicity: "Kinh",
         gender: "Nam",
         relationshipToHead: "Thành viên",
         hometown: "",
-        registrationDate: new Date().toISOString().split("T")[0],
+        residenceRegistrationDate: new Date().toISOString().split("T")[0],
       });
     }
     setIsModalOpen(true);
@@ -99,7 +216,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
           <div>
             <h2 className="text-2xl font-bold text-slate-800 flex items-center">
               {activeHousehold
-                ? `Nhân khẩu hộ: ${activeHousehold.ownerName}`
+                ? `Nhân khẩu hộ: ${activeHousehold.id}`
                 : "Quản lý Nhân khẩu"}
             </h2>
             {activeHousehold ? (
@@ -126,7 +243,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-300 overflow-hidden">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50">
           <div className="relative max-w-md">
             <Search
@@ -145,23 +262,47 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-50 text-slate-500 text-sm uppercase font-semibold">
-              <tr>
+            <thead className="bg-slate-50 text-slate-500 text-sm uppercase font-semibold border-b border-slate-200">
+              <tr className="text-slate-500">
+                {!filterHouseholdId && (
+                  <th className="px-6 py-4">
+                    <button
+                      onClick={() => toggleSort("householdId")}
+                      className="flex items-center gap-2 w-full"
+                      title="Sắp xếp theo mã hộ"
+                    >
+                      HỘ DÂN
+                      {sortBy === "householdId" && (
+                        <span className="text-xs">
+                          {sortOrder === "asc" ? "▲" : "▼"}
+                        </span>
+                      )}
+                    </button>
+                  </th>
+                )}
                 <th className="px-6 py-4">Họ và tên</th>
                 <th className="px-6 py-4">Giới tính</th>
                 <th className="px-6 py-4">Ngày sinh</th>
                 <th className="px-6 py-4">CCCD/CMND</th>
                 <th className="px-6 py-4">Quan hệ</th>
-                {!filterHouseholdId && <th className="px-6 py-4">Thuộc hộ</th>}
+
                 <th className="px-6 py-4 text-right">Hành động</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-300">
               {filteredResidents.map((resident) => (
                 <tr
                   key={resident.id}
                   className="hover:bg-blue-50/50 transition-colors"
                 >
+                  {!filterHouseholdId && (
+                    <td className="px-6 py-4 font-mono text-sm text-slate-600/70">
+                      {
+                        households.find((h) => h.id === resident.householdId)
+                          ?.id
+                      }
+                    </td>
+                  )}
                   <td className="px-6 py-4">
                     <div className="font-medium text-slate-900">
                       {resident.fullName}
@@ -176,9 +317,9 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                     <span
                       className={`text-xs px-2 py-1 rounded-full ${
                         resident.gender === "Nam"
-                          ? "bg-blue-50 text-blue-700"
+                          ? "bg-blue-100 text-blue-700 font-bold"
                           : resident.gender === "Nữ"
-                          ? "bg-pink-50 text-pink-700"
+                          ? "bg-pink-100 text-pink-700 font-bold"
                           : "bg-slate-100"
                       }`}
                     >
@@ -200,21 +341,14 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                        resident.relationshipToHead === "Chủ hộ"
-                          ? "bg-purple-100 text-purple-700 border border-purple-200"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
+                      className={`inline-flex items-center px-2 py-0 text-center rounded-xl text-sm font-bold ${getRelationshipColor(
+                        resident.relationshipToHead
+                      )}`}
                     >
                       {resident.relationshipToHead}
                     </span>
                   </td>
-                  {!filterHouseholdId && (
-                    <td className="px-6 py-4 text-slate-600 text-sm">
-                      {households.find((h) => h.id === resident.householdId)
-                        ?.ownerName || resident.householdId}
-                    </td>
-                  )}
+
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end space-x-2">
                       <button
@@ -247,6 +381,35 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="px-4 py-3 border-t bg-slate-50 flex items-center justify-between">
+          <div className="text-sm text-slate-600">
+            {loading
+              ? "Đang tải..."
+              : `Hiển thị ${
+                  total === 0 ? 0 : (page - 1) * limit + 1
+                } - ${Math.min(page * limit, total)} trên ${total}`}
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="px-3 py-1 bg-white border rounded disabled:opacity-50"
+            >
+              Trước
+            </button>
+            <span className="text-sm text-slate-600">
+              Trang {page} / {Math.max(1, Math.ceil(total / limit) || 1)}
+            </span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= Math.ceil(total / limit) || loading}
+              className="px-3 py-1 bg-white border rounded disabled:opacity-50"
+            >
+              Sau
+            </button>
+          </div>
         </div>
       </div>
 
@@ -287,7 +450,6 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                     Thuộc Hộ khẩu (*)
                   </label>
                   <select
-                    required
                     className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     value={formData.householdId}
                     onChange={(e) =>
@@ -308,10 +470,9 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Quan hệ với chủ hộ (*)
                   </label>
-                  <input
+                  <select
                     required
-                    type="text"
-                    className="w-full p-2 border border-slate-300 rounded-lg"
+                    className="w-full p-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     value={formData.relationshipToHead || ""}
                     onChange={(e) =>
                       setFormData({
@@ -319,8 +480,17 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                         relationshipToHead: e.target.value,
                       })
                     }
-                    placeholder="Vd: Chủ hộ, Vợ, Con..."
-                  />
+                  >
+                    <option value="" disabled>
+                      -- Chọn quan hệ --
+                    </option>
+
+                    {RELATIONSHIP_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="col-span-1">
@@ -534,11 +704,11 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                     required
                     type="date"
                     className="w-full p-2 border border-slate-300 rounded-lg"
-                    value={formData.registrationDate || ""}
+                    value={formData.residenceRegistrationDate || ""}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        registrationDate: e.target.value,
+                        residenceRegistrationDate: e.target.value,
                       })
                     }
                   />
@@ -755,7 +925,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                       <Calendar size={14} className="mr-1.5 text-blue-500" />
                       <span className="font-medium text-slate-800">
                         {new Date(
-                          viewingItem.registrationDate
+                          viewingItem.residenceRegistrationDate
                         ).toLocaleDateString("vi-VN")}
                       </span>
                     </div>
@@ -768,7 +938,12 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                       {viewingItem.householdId}
                     </span>
                     <span className="text-xs text-slate-400 ml-1">
-                      ({getHouseholdInfo(viewingItem.householdId)?.ownerName})
+                      (
+                      {
+                        getHouseholdInfo(viewingItem.householdId)
+                          ?.householdHeaderId
+                      }
+                      )
                     </span>
                   </div>
                   <div className="col-span-2">
