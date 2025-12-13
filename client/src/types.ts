@@ -1,10 +1,12 @@
 // Enum for Fee Types
 export enum FeeCategory {
-  MANDATORY_SANITATION = "MANDATORY_SANITATION", // 6000 VND/month/person
-  VOLUNTARY_CONTRIBUTION = "VOLUNTARY_CONTRIBUTION", // Support funds
+  MANDATORY_SANITATION = "Bắt buộc", // 6000 VND/month/person
+  VOLUNTARY_CONTRIBUTION = "Tự nguyện", // Support funds
 }
 
 export type Gender = "Nam" | "Nữ" | "Khác";
+
+export type PaymentStatus = "Đã đóng" | "Một phần" | "Chưa đóng" | "Quá hạn";
 
 export interface User {
   id: string;
@@ -56,11 +58,13 @@ export interface Resident {
 export interface PaymentType {
   id: string; // payment_type_id
   name: string;
-  category: FeeCategory; // type Enum
+  paymentType: FeeCategory; // type Enum
   amountPerPerson?: number; // amount_per_person (nullable)
-  dateCreated: string;
+  createdAt: string;
+  startDate: string;
   dateExpired?: string;
   description?: string;
+  canEdit?: boolean; // Not in schema but useful for UI
 }
 
 // Giao dịch nộp tiền (HouseholdPayment)
@@ -68,8 +72,17 @@ export interface HouseholdPayment {
   id: string; // payment_id
   householdId: string; // FK
   paymentTypeId: string; // FK to PaymentType
-  amountPaid: number;
-  paymentDate: string;
+
+  amountPaid: number; // Số tiền thực đóng
+  amountExpected: number; // Số tiền phải đóng (hoặc dự kiến)
+
+  paymentDate: string; // Ngày nộp
+  dueDate?: string; // Hạn nộp
+  updatedAt?: string; // Ngày cập nhật trạng thái cuối cùng
+
+  status: PaymentStatus; // Trạng thái
+  category?: FeeCategory; // Denormalized for easier filtering
+
   payerName?: string; // Not in schema but useful for UI
   notes?: string;
 }

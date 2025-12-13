@@ -9,6 +9,8 @@ import React, {
 import toast from "react-hot-toast";
 import { ResidentService } from "../services/residentService";
 import { HouseholdService } from "../services/householdService";
+import { PaymentTypeService } from "../services/paymentTypeService";
+import { HouseholdPaymentService } from "../services/householdPaymentService";
 
 import {
   Household,
@@ -17,13 +19,7 @@ import {
   HouseholdPayment,
   User,
 } from "../types";
-import {
-  INITIAL_HOUSEHOLDS,
-  INITIAL_RESIDENTS,
-  INITIAL_PAYMENT_TYPES,
-  INITIAL_PAYMENTS,
-  MOCK_USER,
-} from "../services/mockData";
+import { MOCK_USER } from "../services/mockData";
 
 const SERVER_URL = "http://localhost:4000";
 
@@ -52,6 +48,8 @@ interface AppContextType {
   deleteResident: (id: number) => void;
 
   addPaymentType: (p: PaymentType) => void;
+  editPaymentType: (p: PaymentType) => void;
+  deletePaymentType: (id: string) => void;
   addPayment: (p: HouseholdPayment) => void;
 
   setHouseholdSelectedId: (h: string | null) => void;
@@ -69,11 +67,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   // Data
   const [households, setHouseholds] = useState<Household[]>([]);
   const [residents, setResidents] = useState<Resident[]>([]);
-  const [paymentTypes, setPaymentTypes] = useState<PaymentType[]>(
-    INITIAL_PAYMENT_TYPES
-  );
-  const [payments, setPayments] =
-    useState<HouseholdPayment[]>(INITIAL_PAYMENTS);
+  const [paymentTypes, setPaymentTypes] = useState<PaymentType[]>([]);
+  const [payments, setPayments] = useState<HouseholdPayment[]>([]);
 
   const [householdSelectedId, setHouseholdSelectedId] = useState<string | null>(
     null
@@ -174,6 +169,57 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
+  const addPaymentType = async (p: PaymentType) => {
+    try {
+      const resp = await PaymentTypeService.addPaymentType(p);
+      setPaymentTypes([...paymentTypes, resp.data.data.paymentType]);
+      toast.success("Thêm khoản thu thành công");
+    } catch (err: any) {
+      toast.error(err.message);
+      throw err;
+    }
+  };
+
+  const editPaymentType = async (p: PaymentType) => {
+    try {
+      const resp = await PaymentTypeService.updatePaymentType(p);
+      setPaymentTypes((prev) =>
+        prev.map((item) =>
+          item.id === p.id ? resp.data.data.paymentType : item
+        )
+      );
+      toast.success("Cập nhật khoản thu thành công");
+    } catch (err: any) {
+      toast.error(err.message);
+      throw err;
+    }
+  };
+
+  const deletePaymentType = async (id: string) => {
+    try {
+      await PaymentTypeService.deletePaymentType(id);
+      setPaymentTypes((prev) => prev.filter((p) => p.id !== id));
+      toast.success("Đã xóa khoản thu");
+    } catch (err: any) {
+      toast.error(err.message);
+      throw err;
+    }
+  };
+
+  // const deleteHousehold = async (id: string) => {
+  //   try {
+  //     await HouseholdService.deleteHousehold(id);
+
+  //     setHouseholds((prev) => prev.filter((h) => h.id !== id));
+  //     setResidents((prev) => prev.filter((r) => r.householdId !== id));
+
+  //     toast.success("Đã xóa hộ khẩu");
+  //   } catch (err: any) {
+  //     toast.error(err.message);
+  //     throw err;
+  //   }
+  // };
+
   const householdsWithOwnerName = useMemo(() => {
     return households.map((h) => {
       let ownerName = "";
@@ -199,6 +245,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     });
   }, [households, residents]);
 
+  const paymentTypesWithCanEdit = useMemo(() => {
+    console.log(paymentTypes);
+    return paymentTypes.map((p) => ({
+      ...p,
+      canEdit: new Date(p.startDate).getTime() > Date.now(),
+    }));
+  }, [paymentTypes]);
+
   useEffect(() => {
     HouseholdService.getHouseholds()
       .then((resp) => setHouseholds(resp.data.data.households))
@@ -207,11 +261,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     ResidentService.getResidents({ page: 1, limit: 100 })
       .then((resp) => setResidents(resp.data.data.residents))
       .catch((err) => toast.error(err.message));
+
+    PaymentTypeService.getPaymentTypes()
+      .then((resp) => setPaymentTypes(resp.data.data.paymentTypes))
+      .catch((err) => toast.error(err.message));
+
+    HouseholdPaymentService.getHouseholdPayments()
+      .then((resp) => setPayments(resp.data.data.payments))
+      .catch((err) => toast.error(err.message));
   }, []);
 
-  const addPaymentType = (p: PaymentType) =>
-    setPaymentTypes([...paymentTypes, p]);
-  const addPayment = (p: HouseholdPayment) => setPayments([p, ...payments]);
+  // const addPaymentType = (p: PaymentType) =>
+  //   setPaymentTypes([...paymentTypes, p]);
+  // const addPayment = (p: HouseholdPayment) => setPayments([p, ...payments]);
+  const addPayment = async (data: HouseholdPayment) => {
+    try {
+      const resp = await HouseholdPaymentService.addHouseholdPayment(data);
+      setPayments([...payments, resp.data.data.householdPayment]);
+      toast.success("Thêm khoản thu thành công");
+    } catch (err: any) {
+      toast.error(err.message);
+      throw err;
+    }
+  };
 
   return (
     <AppContext.Provider
@@ -222,7 +294,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         logout,
         households: householdsWithOwnerName,
         residents,
-        paymentTypes,
+        paymentTypes: paymentTypesWithCanEdit,
         payments,
         addHousehold,
         editHousehold,
@@ -231,6 +303,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         editResident,
         deleteResident,
         addPaymentType,
+        editPaymentType,
+        deletePaymentType,
         addPayment,
         householdSelectedId,
         setHouseholdSelectedId,
