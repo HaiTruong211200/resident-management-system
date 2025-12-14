@@ -12,18 +12,18 @@ router.get(
 );
 router.get("/", householdController.getAllHouseholds);
 
-// router.post(
-//   "/",
-//   [
-//     body("id").optional().isString().toString(),
-//     body("houseNumber").optional().isInt().toInt(),
-//     body("street").optional().isString().toString(),
-//     body("ward").optional().isString().toString(),
-//     body("district").optional().isString().toString(),
-//     body("householdHeadId").optional().isInt().toInt(),
-//   ],
-//   householdController.createHousehold
-// );
+router.post(
+  "/",
+  [
+    body("id").optional().isString().trim(),
+    body("houseNumber").optional().isInt().toInt(),
+    body("street").optional().isString().trim(),
+    body("ward").optional().isString().trim(),
+    body("district").optional().isString().trim(),
+    body("householdHeaderId").optional().isInt().toInt(),
+  ],
+  householdController.createHousehold
+);
 
 router.put(
   "/:id",

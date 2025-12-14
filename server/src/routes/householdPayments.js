@@ -5,6 +5,7 @@ const {
   createHouseholdPayment,
   listHouseholdPayments,
   getHouseholdPaymentById,
+  updateHouseholdPayment,
 } = require("../controllers/householdPaymentController");
 
 router.post(
@@ -31,12 +32,17 @@ router.post(
       .toFloat(),
 
     body("status")
-      .isIn(["PAID", "UNPAID", "PARTIAL", "OVERDUE"])
+      .isIn(["Đã đóng", "Một phần", "Chưa đóng", "Quá hạn", "Chưa bắt đầu"])
       .withMessage("Invalid payment status"),
 
     body("category")
-      .isIn(["MANDATORY_SANITATION", "VOLUNTARY_CONTRIBUTION"])
+      .isIn(["Bắt buộc", "Tự nguyện"])
       .withMessage("Invalid fee category"),
+    body("startDate")
+      .optional()
+      .isISO8601()
+      .withMessage("startDate must be ISO8601")
+      .toDate(),
 
     body("paymentDate")
       .optional()
@@ -53,6 +59,53 @@ router.post(
     body("notes").optional().isString().trim(),
   ],
   createHouseholdPayment
+);
+
+router.patch(
+  "/:id",
+  [
+    param("id").isInt({ min: 1 }).withMessage("id must be an integer").toInt(),
+
+    body("amountExpected")
+      .isFloat({ min: 0 })
+      .withMessage("amountExpected must be >= 0")
+      .toFloat(),
+
+    body("amountPaid")
+      .isFloat({ min: 0 })
+      .withMessage("amountPaid must be >= 0")
+      .toFloat(),
+
+    body("status")
+      .isIn(["Đã đóng", "Một phần", "Chưa đóng", "Quá hạn", "Chưa bắt đầu"])
+      .withMessage("Invalid payment status"),
+
+    body("startDate")
+      .optional()
+      .isISO8601()
+      .withMessage("startDate must be ISO8601")
+      .toDate(),
+
+    body("paymentDate")
+      .optional()
+      .isISO8601()
+      .withMessage("paymentDate must be ISO8601")
+      .toDate(),
+
+    body("dueDate")
+      .optional()
+      .isISO8601()
+      .withMessage("dueDate must be ISO8601")
+      .toDate(),
+
+    body("notes")
+      .optional()
+      .isString()
+      .trim()
+      .isLength({ max: 500 })
+      .withMessage("notes is too long"),
+  ],
+  updateHouseholdPayment
 );
 
 // List all household payments

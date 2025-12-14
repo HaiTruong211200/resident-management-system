@@ -41,7 +41,7 @@ async function searchHouseholds(keyword) {
   const num = Number(keyword);
   const parts = [];
   if (!Number.isNaN(num)) {
-    parts.push(`house_number.eq.${num}`);
+    parts.push(`houseNumber.eq.${num}`);
     parts.push(`street.eq.${num}`);
     parts.push(`ward.eq.${num}`);
     parts.push(`district.eq.${num}`);
@@ -50,7 +50,7 @@ async function searchHouseholds(keyword) {
   const filter = parts.length ? parts.join(",") : "id.eq.-1";
   const { data, error } = await supabase
     .from("households")
-    .select("*, household_head_id")
+    .select("*, householdHeaderId")
     .or(filter);
   if (error) throw error;
   return data || [];

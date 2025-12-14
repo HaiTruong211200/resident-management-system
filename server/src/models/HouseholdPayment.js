@@ -39,9 +39,34 @@ async function findById(id) {
   return data || null;
 }
 
+async function update(id, payload) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("householdPayments")
+    .update(payload)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateByPaymentType(paymentTypeId, payload) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("householdPayments")
+    .update(payload)
+    .eq("paymentTypeId", paymentTypeId)
+    .select("*");
+  if (error) throw error;
+  return data;
+}
+
 module.exports = {
   create,
   deleteMany,
   list,
   findById,
+  update,
+  updateByPaymentType,
 };

@@ -27,17 +27,19 @@ router.get("/", listPaymentTypes);
 // Get payment type by id
 router.get("/:id", [param("id").isInt().toInt()], getPaymentTypeById);
 
-router.put(
+router.patch(
   "/:id",
   [
-    param("id").isInt().toInt(),
     body("pass").optional().isString().notEmpty(),
     body("paymentType").optional().isIn(["Bắt buộc", "Tự nguyện"]),
-    body("amountPerPerson").optional().isFloat({ min: 0 }).toFloat(),
+    body("amountPerPerson")
+      .optional({ nullable: true })
+      .isFloat({ min: 0 })
+      .toFloat(),
     body("createdAt").optional().isISO8601().toDate(),
     body("startDate").optional().isISO8601().toDate(),
     body("dateExpired").optional().isISO8601().toDate(),
-    body("description").optional().isString(),
+    body("description").optional({ nullable: true }).isString(),
   ],
   updatePaymentType
 );

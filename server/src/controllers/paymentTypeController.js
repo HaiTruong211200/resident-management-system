@@ -1,5 +1,8 @@
 const { validationResult } = require("express-validator");
 const PaymentType = require("../models/PaymentType");
+const Household = require("../models/Household");
+const HouseholdPayment = require("../models/HouseholdPayment");
+const Resident = require("../models/Resident");
 const {
   sendSuccess,
   sendError,
@@ -12,9 +15,28 @@ async function createPaymentType(req, res) {
   try {
     const payload = req.body; // {name, pass, type, amount_per_person?, date_created?}
     const pt = await PaymentType.create(payload);
+
+    if (pt.paymentType === "Bắt buộc") {
+      const households = await Household.getAllHouseholds();
+
+      for (const household of households) {
+        const memberCount = household.memberCount || 0;
+        await HouseholdPayment.create({
+          householdId: household.id,
+          paymentTypeId: pt.id,
+          amountExpected: memberCount * pt.amountPerPerson,
+          amountPaid: 0,
+          status: "Chưa bắt đầu",
+          category: "Bắt buộc",
+          startDate: pt.startDate,
+          dueDate: pt.dateExpired,
+        });
+      }
+    }
     return sendSuccess(res, { paymentType: pt }, { status: 201 });
   } catch (err) {
     if (err && err.code === "23505") {
+      console.log(err);
       return sendError(res, {
         status: 409,
         message: "Duplicate name",
@@ -58,11 +80,26 @@ async function getPaymentTypeById(req, res) {
 async function updatePaymentType(req, res) {
   const id = req.params.id;
   const errors = validationResult(req);
+  console.log(errors);
   if (!errors.isEmpty()) return validationFailed(res, errors.array());
 
   try {
     const payload = req.body;
+    console.log("Update payload:", payload);
     const pt = await PaymentType.update(id, payload);
+
+    if (pt.paymentType === "Bắt buộc") {
+      const households = await Household.getAllHouseholds();
+
+      for (const household of households) {
+        const memberCount = household.memberCount || 0;
+        await HouseholdPayment.updateByPaymentType(pt.id, {
+          amountExpected: payload.amountPerPerson * memberCount,
+          startDate: payload.startDate,
+          dueDate: payload.dateExpired,
+        });
+      }
+    }
     return sendSuccess(res, { paymentType: pt });
   } catch (err) {
     console.error(err);

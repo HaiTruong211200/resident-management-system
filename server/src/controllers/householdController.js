@@ -18,31 +18,36 @@ const {
 
 async function createHouseholdHandler(req, res) {
   const errors = validationResult(req);
+  console.log("Validation errors:", errors.array());
   if (!errors.isEmpty()) return validationFailed(res, errors.array());
 
   try {
-    const { household_head_id, house_number, street, ward, district } =
-      req.body;
+    const { householdHeaderId, houseNumber, street, ward, district } = req.body;
+    console.log("Creating household with data:", req.body);
 
     const h = await modelCreateHousehold({
-      household_head_id: null,
-      house_number,
+      id: req.body.id,
+      householdHeaderId: householdHeaderId,
+      houseNumber,
       street,
       ward,
       district,
     });
 
-    if (household_head_id) {
-      const resident = await findResidentById(household_head_id);
+    if (householdHeaderId) {
+      const resident = await findResidentById(householdHeaderId);
       if (!resident)
         return sendError(res, {
           status: 404,
-          message: "Resident (household_head_id) not found",
+          message: "Resident (householdHeaderId) not found",
           code: "RESIDENT_NOT_FOUND",
         });
-      await updateResident(resident.id, { household_id: h.id });
+      await updateResident(resident.id, {
+        householdId: h.id,
+        relationToHead: "Chủ hộ",
+      });
       const updated = await updateHouseholdDAO(h.id, {
-        household_head_id: resident.id,
+        householdHeaderId: resident.id,
       });
       return sendSuccess(res, { household: updated }, { status: 201 });
     }
@@ -61,8 +66,8 @@ async function updateHousehold(req, res) {
   try {
     const payload = req.body;
 
-    if (payload.household_head_id) {
-      const resident = await findResidentById(payload.household_head_id);
+    if (payload.householdHeaderId) {
+      const resident = await findResidentById(payload.householdHeaderId);
       if (!resident)
         return sendError(res, {
           status: 404,
