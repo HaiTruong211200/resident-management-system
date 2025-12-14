@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAppContext } from "../../context/AppContext";
 import {
   PaymentType,
@@ -17,7 +17,16 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  Hourglass,
+  Ban,
+  User,
+  ArrowRightCircle,
+  FileText,
+  ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
+
+const ITEMS_PER_PAGE = 5;
 
 export const FeePage: React.FC = () => {
   const {
@@ -28,6 +37,7 @@ export const FeePage: React.FC = () => {
     addPaymentType,
     editPaymentType,
     addPayment,
+    editPayment,
   } = useAppContext();
   const [activeTab, setActiveTab] = useState<"CAMPAIGNS" | "PAYMENTS">(
     "PAYMENTS"
@@ -36,15 +46,24 @@ export const FeePage: React.FC = () => {
     FeeCategory.MANDATORY_SANITATION
   );
 
+  const [currentPage, setCurrentPage] = useState(1);
+  console.log({ paymentTypes });
+
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<PaymentType | null>(
     null
   );
+  const [editingPayment, setEditingPayment] = useState<HouseholdPayment | null>(
+    null
+  );
 
   // Filter States
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("ALL");
+  const [selectedStatus, setSelectedStatus] = useState<PaymentStatus | "ALL">(
+    "ALL"
+  );
 
   // Form States
   const [newCampaign, setNewCampaign] = useState<Partial<PaymentType>>({
@@ -58,22 +77,23 @@ export const FeePage: React.FC = () => {
 
   // Helpers
   const getHouseholdMemberCount = (hid: string) =>
-    residents.filter((r) => r.householdId === hid).length;
+    residents.filter((r) => r.householdId == hid).length;
 
   const formatter = new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "VND",
   });
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCampaignId, selectedStatus, paymentCategoryTab, activeTab]);
+
   // Payment Logic
   const handlePaymentHouseholdChange = (hid: string) => {
-    const household = households.find((h) => h.id === hid);
-    const campaign = paymentTypes.find(
-      (c) => c.id === newPayment.paymentTypeId
-    );
+    const household = households.find((h) => h.id == hid);
+    const campaign = paymentTypes.find((c) => c.id == newPayment.paymentTypeId);
 
     let expected = 0;
-    let amount = 0;
     let note = "";
 
     if (household && campaign) {
@@ -83,12 +103,15 @@ export const FeePage: React.FC = () => {
       ) {
         // Auto calculate: 6000 * people * 12 months (Assuming annual payment as default)
         const members = getHouseholdMemberCount(hid);
-        amount = members * campaign.amountPerPerson * 12;
-        note = `Thu 12 tháng cho ${members} nhân khẩu (${formatter.format(
+        expected = members * campaign.amountPerPerson;
+        note = `Thu tiền ${
+          campaign.name
+        } cho ${members} nhân khẩu (${formatter.format(
           campaign.amountPerPerson
         )}/tháng)`;
       }
     }
+    console.log({ expected });
 
     setNewPayment({
       ...newPayment,
@@ -140,6 +163,21 @@ export const FeePage: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const handleOpenPaymentModal = (payment?: HouseholdPayment) => {
+    if (payment) {
+      setEditingPayment(payment);
+      setNewPayment(payment);
+    } else {
+      setEditingPayment(null);
+      setNewPayment({
+        paymentDate: new Date().toISOString().split("T")[0],
+        amountPaid: 0,
+        amountExpected: 0,
+      });
+    }
+    setPaymentModalOpen(true);
+  };
+
   const getStatusBadge = (status: PaymentStatus) => {
     switch (status) {
       case "Đã đóng":
@@ -158,6 +196,12 @@ export const FeePage: React.FC = () => {
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-800">
             <AlertCircle size={12} className="mr-1" /> Quá hạn
+          </span>
+        );
+      case "Chưa bắt đầu":
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-200 text-slate-600">
+            <Hourglass size={12} className="mr-1" /> Chưa bắt đầu
           </span>
         );
       default:
@@ -180,11 +224,23 @@ export const FeePage: React.FC = () => {
     if (pt?.paymentType !== paymentCategoryTab) return false;
 
     // 2. Filter by Dropdown
-    if (selectedCampaignId !== "ALL" && p.paymentTypeId !== selectedCampaignId)
+    if (selectedCampaignId !== "ALL" && p.paymentTypeId != selectedCampaignId)
       return false;
+
+    // 3. Filter by Status Dropdown
+    if (selectedStatus !== "ALL" && p.status !== selectedStatus) return false;
 
     return true;
   });
+
+  // Pagination Logic
+  const totalItems = filteredPayments.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const currentTableData = filteredPayments.slice(
+    startIndex,
+    startIndex + ITEMS_PER_PAGE
+  );
 
   return (
     <div className="space-y-6">
@@ -345,23 +401,45 @@ export const FeePage: React.FC = () => {
           </div>
 
           <div className="p-4 border-b border-teal-50 bg-white flex justify-between items-center flex-wrap gap-4">
-            <div className="flex items-center gap-2">
-              <Filter size={18} className="text-slate-400" />
-              <select
-                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
-                value={selectedCampaignId}
-                onChange={(e) => setSelectedCampaignId(e.target.value)}
-              >
-                <option value="ALL">Tất cả khoản thu trong danh mục</option>
-                {displayedPaymentTypes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-1 items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Filter size={18} className="text-slate-400" />
+                <select
+                  className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
+                  value={selectedCampaignId}
+                  onChange={(e) => {
+                    console.log(e.target.value);
+                    setSelectedCampaignId(e.target.value);
+                  }}
+                >
+                  <option value="ALL">Tất cả khoản thu trong danh mục</option>
+                  {displayedPaymentTypes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500">Trạng thái:</span>
+                <select
+                  className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
+                  value={selectedStatus}
+                  onChange={(e) =>
+                    setSelectedStatus(e.target.value as PaymentStatus | "ALL")
+                  }
+                >
+                  <option value="ALL">Tất cả</option>
+                  <option value="Đã đóng">Đã đóng</option>
+                  <option value="Một phần">Đóng một phần</option>
+                  <option value="Chưa đóng">Chưa đóng</option>
+                  <option value="Quá hạn">Quá hạn</option>
+                  <option value="Chưa bắt đầu">Chưa bắt đầu</option>
+                </select>
+              </div>
             </div>
             <button
-              onClick={() => setPaymentModalOpen(true)}
+              onClick={() => handleOpenPaymentModal()}
               className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg flex items-center shadow-sm shadow-teal-600/20 transition-colors"
             >
               <DollarSign size={18} className="mr-2" /> Ghi nhận đóng phí
@@ -372,27 +450,34 @@ export const FeePage: React.FC = () => {
             <table className="w-full text-left">
               <thead className="bg-teal-50 text-teal-900 text-sm uppercase font-bold border-b border-teal-100">
                 <tr>
-                  <th className="px-6 py-4">Mã GD / Ngày</th>
-                  <th className="px-6 py-4">Hộ gia đình</th>
-                  <th className="px-6 py-4">Khoản thu</th>
-                  <th className="px-6 py-4 text-center">Trạng thái</th>
-                  <th className="px-6 py-4 text-right">Số tiền</th>
-                  <th className="px-6 py-4 text-right">Hạn nộp</th>
+                  <th className="px-4 py-4">Mã GD / Ngày</th>
+                  <th className="px-4 py-4">Hộ gia đình</th>
+                  <th className="px-4 py-4">Khoản thu</th>
+                  <th className="px-4 py-4 text-center">Trạng thái</th>
+                  <th className="px-4 py-4 text-right">Số tiền</th>
+                  <th className="px-4 py-4 text-right">Ngày bắt đầu</th>
+                  <th className="px-4 py-4 text-right">Hạn nộp</th>
+                  <th className="px-4 py-4 text-center">Thao tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-teal-50">
-                {filteredPayments.map((pay) => {
+              <tbody className="divide-y divide-teal-150">
+                {currentTableData.map((pay) => {
                   const hh = households.find((h) => h.id === pay.householdId);
                   const camp = paymentTypes.find(
                     (c) => c.id === pay.paymentTypeId
                   );
+                  const isEditable = [
+                    "Một phần",
+                    "Chưa đóng",
+                    "Chưa bắt đầu",
+                  ].includes(pay.status);
 
                   return (
                     <tr
                       key={pay.id}
                       className="hover:bg-teal-50/40 transition-colors"
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         <div className="font-mono text-xs text-teal-600/70 font-semibold">
                           {pay.id}
                         </div>
@@ -402,7 +487,7 @@ export const FeePage: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         <div className="font-bold text-slate-800">
                           {hh?.ownerName}
                         </div>
@@ -410,7 +495,7 @@ export const FeePage: React.FC = () => {
                           Người nộp: {pay.payerName || "(Chưa có)"}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-slate-600">
+                      <td className="px-4 py-4 text-sm text-slate-600">
                         <span className="font-medium">{camp?.name}</span>
                         {pay.notes && (
                           <div className="text-xs text-slate-400 italic mt-1 max-w-xs truncate">
@@ -418,10 +503,10 @@ export const FeePage: React.FC = () => {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-4 text-center">
                         {getStatusBadge(pay.status)}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-4 text-right">
                         {/* Main Change Here: Display logic for amounts */}
                         <div
                           className={`font-bold ${
@@ -441,10 +526,33 @@ export const FeePage: React.FC = () => {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-right text-sm text-slate-500">
+                      <td className="px-4 py-4 text-right text-sm text-slate-500">
+                        {pay.startDate
+                          ? new Date(pay.startDate).toLocaleDateString("vi-VN")
+                          : "-"}
+                      </td>
+                      <td className="px-4 py-4 text-right text-sm text-slate-500">
                         {pay.dueDate
                           ? new Date(pay.dueDate).toLocaleDateString("vi-VN")
                           : "-"}
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        {isEditable ? (
+                          <button
+                            onClick={() => handleOpenPaymentModal(pay)}
+                            className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-all"
+                            title="Cập nhật / Đóng thêm"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                        ) : (
+                          <div
+                            className="flex justify-center"
+                            title="Không thể chỉnh sửa hóa đơn đã đóng hoặc quá hạn"
+                          >
+                            <Ban size={16} className="text-slate-300" />
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -462,6 +570,67 @@ export const FeePage: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {totalItems > 0 && (
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white">
+              <div className="text-sm text-slate-500">
+                Hiển thị{" "}
+                <span className="font-semibold text-slate-800">
+                  {startIndex + 1}
+                </span>{" "}
+                đến{" "}
+                <span className="font-semibold text-slate-800">
+                  {Math.min(startIndex + ITEMS_PER_PAGE, totalItems)}
+                </span>{" "}
+                trong số{" "}
+                <span className="font-semibold text-slate-800">
+                  {totalItems}
+                </span>{" "}
+                giao dịch
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={16} className="text-slate-600" />
+                </button>
+
+                {/* Simple Page Numbers */}
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? "bg-teal-600 text-white shadow-sm"
+                            : "text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-200"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
+                </div>
+
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={16} className="text-slate-600" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -646,35 +815,50 @@ export const FeePage: React.FC = () => {
       {/* Payment Modal */}
       {paymentModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden animate-in zoom-in duration-200">
             <div className="px-6 py-4 bg-teal-50 border-b border-teal-100">
               <h3 className="text-lg font-bold flex items-center text-teal-800">
-                <DollarSign className="mr-2 text-teal-600" size={20} /> Ghi nhận
-                nộp phí
+                <DollarSign className="mr-2 text-teal-600" size={20} />{" "}
+                {editingPayment
+                  ? "Cập nhật nộp phí / Đóng thêm"
+                  : "Ghi nhận nộp phí"}
               </h3>
             </div>
 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                addPayment({
-                  ...newPayment,
-                  id: `PAY${Date.now()}`,
-                  category: paymentTypes.find(
-                    (c) => c.id === newPayment.paymentTypeId
-                  )?.paymentType,
-                } as HouseholdPayment);
+                if (editingPayment) {
+                  editPayment({
+                    ...newPayment,
+                    // Re-evaluate status based on new amount
+                    status:
+                      (newPayment.amountPaid || 0) >=
+                      (newPayment.amountExpected || 0)
+                        ? "Đã đóng"
+                        : "Một phần",
+                  } as HouseholdPayment);
+                } else {
+                  addPayment({
+                    ...newPayment,
+                    id: `PAY${Date.now()}`,
+                    category: paymentTypes.find(
+                      (c) => c.id === newPayment.paymentTypeId
+                    )?.paymentType,
+                  } as HouseholdPayment);
+                }
                 setPaymentModalOpen(false);
               }}
-              className="p-6 space-y-4"
+              className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6"
             >
-              <div>
+              {/* Column 1: Payment Type */}
+              <div className="col-span-1">
                 <label className="block text-sm font-medium mb-1 text-slate-700">
                   Chọn khoản thu (*)
                 </label>
                 <select
                   required
-                  className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none bg-white"
+                  className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none bg-white disabled:bg-slate-100 disabled:text-slate-500"
                   value={newPayment.paymentTypeId || ""}
                   onChange={(e) =>
                     setNewPayment({
@@ -682,6 +866,7 @@ export const FeePage: React.FC = () => {
                       paymentTypeId: e.target.value,
                     })
                   }
+                  disabled={!!editingPayment} // Disable when editing
                 >
                   <option value="">-- Chọn khoản thu --</option>
                   {paymentTypes.map((c) => (
@@ -695,118 +880,188 @@ export const FeePage: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <div>
+
+              {/* Column 2: Household */}
+              <div className="col-span-1">
                 <label className="block text-sm font-medium mb-1 text-slate-700">
                   Hộ gia đình nộp (*)
                 </label>
                 <select
                   required
-                  className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none bg-white"
+                  className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none bg-white disabled:bg-slate-100 disabled:text-slate-500"
                   value={newPayment.householdId || ""}
                   onChange={(e) => handlePaymentHouseholdChange(e.target.value)}
-                  disabled={!newPayment.paymentTypeId}
+                  disabled={!newPayment.paymentTypeId || !!editingPayment} // Disable when editing
                 >
                   <option value="">-- Chọn hộ --</option>
                   {households.map((h) => (
                     <option key={h.id} value={h.id}>
-                      {h.id} - {h.ownerName} (Số thành viên:{" "}
-                      {getHouseholdMemberCount(h.id)})
+                      {h.id} - {h.ownerName} ({getHouseholdMemberCount(h.id)}{" "}
+                      thành viên)
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-teal-50 p-3 rounded-lg border border-teal-100 col-span-2">
-                  <label className="block text-sm font-bold text-teal-800 mb-1">
+              {/* Financial Block - Spanning 2 columns */}
+              <div className="col-span-1 md:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                <div className="absolute top-0 right-0 p-2">
+                  {newPayment.status && getStatusBadge(newPayment.status)}
+                </div>
+
+                {/* Expected Amount */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
                     Số tiền phải đóng
                   </label>
-                  <input
-                    disabled
-                    type="text"
-                    className="w-full bg-transparent border-none p-0 text-xl font-bold text-teal-700 focus:ring-0"
-                    value={formatter.format(newPayment.amountExpected || 0)}
-                  />
-                </div>
-
-                <div className="col-span-1">
-                  <label className="block text-sm font-medium mb-1 text-slate-700">
-                    Số tiền thực đóng
-                  </label>
-                  <input
-                    required
-                    type="number"
-                    className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
-                    value={newPayment.amountPaid || ""}
-                    onChange={(e) =>
-                      handleAmountPaidChange(Number(e.target.value))
-                    }
-                  />
-                </div>
-
-                <div className="col-span-1">
-                  <label className="block text-sm font-medium mb-1 text-slate-700">
-                    Trạng thái
-                  </label>
-                  <div className="mt-2">
-                    {newPayment.status && getStatusBadge(newPayment.status)}
+                  <div className="flex items-center">
+                    <span className="text-xl font-bold text-teal-700">
+                      {formatter.format(newPayment.amountExpected || 0)}
+                    </span>
+                    {newPayment.amountExpected &&
+                    newPayment.amountExpected > 0 ? (
+                      <span className="ml-2 text-xs bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-500">
+                        Dự tính
+                      </span>
+                    ) : null}
                   </div>
+                </div>
+
+                {/* Paid Amount Input */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                    Thực đóng (Tổng cộng)
+                  </label>
+                  <div className="relative">
+                    <input
+                      required
+                      type="number"
+                      className="w-full border border-slate-300 p-2 pl-8 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-teal-500 outline-none"
+                      value={newPayment.amountPaid || ""}
+                      onChange={(e) =>
+                        handleAmountPaidChange(Number(e.target.value))
+                      }
+                    />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">
+                      ₫
+                    </span>
+                  </div>
+
+                  {/* "Pay Remainder" Helper for Editing */}
+                  {editingPayment &&
+                    newPayment.amountExpected &&
+                    newPayment.amountPaid !== undefined &&
+                    newPayment.amountPaid < newPayment.amountExpected && (
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleAmountPaidChange(
+                              newPayment.amountExpected || 0
+                            )
+                          }
+                          className="text-xs flex items-center bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded transition-colors font-semibold"
+                        >
+                          <ArrowRightCircle size={12} className="mr-1" />
+                          Đóng nốt phần thiếu:{" "}
+                          {formatter.format(
+                            newPayment.amountExpected - newPayment.amountPaid
+                          )}
+                        </button>
+                      </div>
+                    )}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700">
-                  Ngày hết hạn (Tuỳ chọn)
+              {/* Payer Info */}
+              {/* <div className="col-span-1">
+                <label className="block text-sm font-medium mb-1 text-slate-700 flex items-center">
+                  <User size={14} className="mr-1 text-slate-400" /> Người đi
+                  nộp
                 </label>
                 <input
+                  type="text"
+                  className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+                  value={newPayment.payerName || ""}
+                  onChange={(e) =>
+                    setNewPayment({ ...newPayment, payerName: e.target.value })
+                  }
+                  placeholder="Nhập tên người nộp..."
+                />
+              </div> */}
+              <div className="col-span-1">
+                <label className="block text-sm font-medium mb-1 text-slate-700 flex items-center">
+                  <Calendar size={14} className="mr-1 text-slate-400" /> Ngày
+                  bắt đầu
+                </label>
+                <input
+                  // disabled={true}
                   type="date"
-                  className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
-                  value={newPayment.dueDate || ""}
+                  className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                  value={
+                    newPayment.startDate
+                      ? new Date(newPayment.startDate)
+                          .toISOString()
+                          .split("T")[0]
+                      : ""
+                  }
+                  onChange={(e) =>
+                    setNewPayment({ ...newPayment, startDate: e.target.value })
+                  }
+                />
+              </div>
+
+              {/* Due Date */}
+              <div className="col-span-1">
+                <label className="block text-sm font-medium mb-1 text-slate-700 flex items-center">
+                  <Calendar size={14} className="mr-1 text-slate-400" /> Ngày
+                  hết hạn (Tuỳ chọn)
+                </label>
+                <input
+                  // disabled={true}
+                  type="date"
+                  className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                  value={
+                    newPayment.dueDate
+                      ? new Date(newPayment.dueDate).toISOString().split("T")[0]
+                      : ""
+                  }
                   onChange={(e) =>
                     setNewPayment({ ...newPayment, dueDate: e.target.value })
                   }
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700">
-                  Người đi nộp
-                </label>
-                <input
-                  type="text"
-                  className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
-                  value={newPayment.payerName || ""}
-                  onChange={(e) =>
-                    setNewPayment({ ...newPayment, payerName: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700">
-                  Ghi chú
+              {/* Notes - Full width */}
+              <div className="col-span-1 md:col-span-2">
+                <label className="block text-sm font-medium mb-1 text-slate-700 flex items-center">
+                  <FileText size={14} className="mr-1 text-slate-400" /> Ghi chú
                 </label>
                 <textarea
-                  className="w-full border border-slate-300 p-2 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+                  className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
                   rows={2}
                   value={newPayment.notes || ""}
                   onChange={(e) =>
                     setNewPayment({ ...newPayment, notes: e.target.value })
                   }
+                  placeholder="Ghi chú thêm về giao dịch..."
                 />
               </div>
-              <div className="flex justify-end pt-4 border-t border-slate-100">
+
+              <div className="col-span-1 md:col-span-2 flex justify-end pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setPaymentModalOpen(false)}
-                  className="mr-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="mr-2 px-6 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg shadow-sm transition-colors"
+                  className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg shadow-sm transition-colors font-bold flex items-center"
                 >
-                  Lưu phiếu thu
+                  <CheckCircle size={18} className="mr-2" />{" "}
+                  {editingPayment ? "Lưu cập nhật" : "Lưu phiếu thu"}
                 </button>
               </div>
             </form>

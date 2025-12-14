@@ -57,13 +57,14 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
       setFormData({
         id: `HK${Math.floor(Math.random() * 10000)}`,
         district: "Thanh Xuân", // Default
-        ward: "",
-        houseNumber: "",
-        street: "",
+        ward: "Nguyễn Trãi",
+        houseNumber: "12",
+        street: "Đồng Tâm",
         // prefer first household from remote data when available
         // this is only used as a sensible default for the form
         ...(households[0] ? { id: households[0].id } : {}),
       });
+      console.log("Default form data:", formData);
     }
     setIsModalOpen(true);
   };
@@ -77,6 +78,7 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
     }
     setIsModalOpen(false);
   };
+  console.log(formData);
 
   const countMembers = (householdId: string) =>
     residents.filter((r) => r.householdId === householdId).length;

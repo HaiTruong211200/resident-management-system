@@ -12,7 +12,6 @@ export const PaymentTypeService = {
 
   addPaymentType(data: PaymentType) {
     return api.post("/payment-types", {
-      id: data.id,
       name: data.name,
       paymentType: data.paymentType, // enum bắt buộc
       amountPerPerson: data.amountPerPerson,
@@ -24,7 +23,8 @@ export const PaymentTypeService = {
   },
 
   updatePaymentType(data: PaymentType) {
-    return api.put(`/payment-types/${data.id}`, {
+    console.log("Updating PaymentType:", data);
+    return api.patch(`/payment-types/${data.id}`, {
       name: data.name,
       paymentType: data.paymentType,
       amountPerPerson: data.amountPerPerson,

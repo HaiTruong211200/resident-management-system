@@ -31,13 +31,13 @@ export const HouseholdPaymentService = {
    */
   addHouseholdPayment(data: HouseholdPayment) {
     return api.post("/household-payments", {
-      id: data.id,
       paymentTypeId: data.paymentTypeId,
       householdId: data.householdId,
       amountPaid: data.amountPaid,
       amountExpected: data.amountExpected,
       status: data.status,
       category: data.category,
+      startDate: data.startDate,
       paymentDate: data.paymentDate,
       dueDate: data.dueDate,
       payerName: data.payerName,
@@ -49,16 +49,13 @@ export const HouseholdPaymentService = {
    * Cập nhật khoản thanh toán
    */
   updateHouseholdPayment(data: HouseholdPayment) {
-    return api.put(`/household-payments/${data.id}`, {
-      paymentTypeId: data.paymentTypeId,
-      householdId: data.householdId,
+    return api.patch(`/household-payments/${data.id}`, {
       amountPaid: data.amountPaid,
       amountExpected: data.amountExpected,
       status: data.status,
-      category: data.category,
+      startDate: data.startDate,
       paymentDate: data.paymentDate,
       dueDate: data.dueDate,
-      payerName: data.payerName,
       notes: data.notes,
     });
   },

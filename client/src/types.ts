@@ -6,7 +6,12 @@ export enum FeeCategory {
 
 export type Gender = "Nam" | "Nữ" | "Khác";
 
-export type PaymentStatus = "Đã đóng" | "Một phần" | "Chưa đóng" | "Quá hạn";
+export type PaymentStatus =
+  | "Đã đóng"
+  | "Một phần"
+  | "Chưa đóng"
+  | "Quá hạn"
+  | "Chưa bắt đầu";
 
 export interface User {
   id: string;
@@ -77,6 +82,7 @@ export interface HouseholdPayment {
   amountExpected: number; // Số tiền phải đóng (hoặc dự kiến)
 
   paymentDate: string; // Ngày nộp
+  startDate?: string; // Ngày bắt đầu áp dụng
   dueDate?: string; // Hạn nộp
   updatedAt?: string; // Ngày cập nhật trạng thái cuối cùng
 

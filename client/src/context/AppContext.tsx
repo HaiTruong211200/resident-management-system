@@ -50,7 +50,9 @@ interface AppContextType {
   addPaymentType: (p: PaymentType) => void;
   editPaymentType: (p: PaymentType) => void;
   deletePaymentType: (id: string) => void;
+
   addPayment: (p: HouseholdPayment) => void;
+  editPayment: (p: HouseholdPayment) => void;
 
   setHouseholdSelectedId: (h: string | null) => void;
   setCurrentView: (v: string | null) => void;
@@ -277,8 +279,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const addPayment = async (data: HouseholdPayment) => {
     try {
       const resp = await HouseholdPaymentService.addHouseholdPayment(data);
-      setPayments([...payments, resp.data.data.householdPayment]);
+      setPayments([...payments, resp.data.data.payment]);
       toast.success("Thêm khoản thu thành công");
+    } catch (err: any) {
+      toast.error(err.message);
+      throw err;
+    }
+  };
+
+  const editPayment = async (data: HouseholdPayment) => {
+    try {
+      const resp = await HouseholdPaymentService.updateHouseholdPayment(data);
+      console.log("Edit Payment response:", resp);
+      setPayments((prev) =>
+        prev.map((p) => (p.id === data.id ? resp.data.data.payment : p))
+      );
+      toast.success("Cập nhật khoản thu thành công");
     } catch (err: any) {
       toast.error(err.message);
       throw err;
@@ -306,6 +322,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         editPaymentType,
         deletePaymentType,
         addPayment,
+        editPayment,
         householdSelectedId,
         setHouseholdSelectedId,
         currentView,
