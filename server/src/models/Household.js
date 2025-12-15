@@ -1,37 +1,34 @@
-const { getSupabase } = require("../config/db");
+const {getSupabase} = require('../config/db');
 // ERD-aligned Supabase DAO. Table: households (int PK), columns:
-// household_head_id, house_number, street, ward, district (ints)
+// householdHeadId, houseNumber, street, ward, district, memberCount (ints)
 
 async function createHousehold(payload) {
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("households")
-    .insert(payload)
-    .select("*")
-    .single();
+  // Ensure memberCount starts at 1 if not provided
+  if (!payload.memberCount) {
+    payload.memberCount = 1;
+  }
+  const {data, error} =
+      await supabase.from('households').insert(payload).select('*').single();
   if (error) throw error;
   return data;
 }
 
 async function updateHousehold(id, payload) {
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("households")
-    .update(payload)
-    .eq("id", id)
-    .select("*")
-    .single();
+  const {data, error} = await supabase.from('households')
+                            .update(payload)
+                            .eq('id', id)
+                            .select('*')
+                            .single();
   if (error) throw error;
   return data;
 }
 
 async function findById(id) {
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("households")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  const {data, error} =
+      await supabase.from('households').select('*').eq('id', id).maybeSingle();
   if (error) throw error;
   return data || null;
 }
@@ -47,32 +44,45 @@ async function searchHouseholds(keyword) {
     parts.push(`district.eq.${num}`);
   }
   // If not numeric, no matches for ints; return empty set via impossible filter
-  const filter = parts.length ? parts.join(",") : "id.eq.-1";
-  const { data, error } = await supabase
-    .from("households")
-    .select("*, householdHeaderId")
-    .or(filter);
+  const filter = parts.length ? parts.join(',') : 'id.eq.-1';
+  const {data, error} = await supabase.from('households')
+                            .select('*, householdHeaderId')
+                            .or(filter);
   if (error) throw error;
   return data || [];
 }
 
 async function deleteMany() {
   const supabase = getSupabase();
-  const { error } = await supabase
-    .from("households")
-    .delete()
-    .not("id", "is", null);
+  const {error} =
+      await supabase.from('households').delete().not('id', 'is', null);
   if (error) throw error;
 }
 
 async function getAllHouseholds() {
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("households")
-    .select("*")
-    .order("id", { ascending: true });
+  const {data, error} =
+      await supabase.from('households').select('*').order('id', {
+        ascending: true
+      });
   if (error) throw error;
   return data || [];
+}
+
+async function updateMemberCount(householdId, increment = true) {
+  const supabase = getSupabase();
+  const household = await findById(householdId);
+  if (!household) throw new Error('Household not found');
+
+  const newCount = increment ? household.memberCount + 1 :
+                               Math.max(0, household.memberCount - 1);
+  const {data, error} = await supabase.from('households')
+                            .update({memberCount: newCount})
+                            .eq('id', householdId)
+                            .select('*')
+                            .single();
+  if (error) throw error;
+  return data;
 }
 
 module.exports = {
@@ -82,4 +92,5 @@ module.exports = {
   searchHouseholds,
   deleteMany,
   getAllHouseholds,
+  updateMemberCount,
 };

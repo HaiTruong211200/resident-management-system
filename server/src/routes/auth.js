@@ -46,7 +46,7 @@ router.post(
           });
 
         const account =
-            await createAccount({user_name: name, email, pass: password});
+            await createAccount({username: name, email, pass: password});
         const token = signToken(account);
         return sendSuccess(
             res, {

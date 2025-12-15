@@ -1,16 +1,16 @@
 const {getSupabase} = require('../config/db');
 const bcrypt = require('bcryptjs');
 // Pure Supabase DAO implementation (mongoose removed)
-// Table: accounts (id uuid pk, user_name unique, email unique, pass hashed,
+// Table: accounts (id uuid pk, username unique, email unique, pass hashed,
 // role)
 
-async function createAccount({user_name, email, pass, role = 'user'}) {
+async function createAccount({username, email, pass, role = 'user'}) {
   const salt = await bcrypt.genSalt(10);
   const hash = await bcrypt.hash(pass, salt);
   const supabase = getSupabase();
   const {data, error} = await supabase.from('accounts')
-                            .insert({user_name, email, pass: hash, role})
-                            .select('id, user_name, email, role')
+                            .insert({username, email, pass: hash, role})
+                            .select('id, username, email, role')
                             .single();
   if (error) throw error;
   return data;
@@ -18,8 +18,8 @@ async function createAccount({user_name, email, pass, role = 'user'}) {
 
 async function findByEmail(email, withPassword = false) {
   const supabase = getSupabase();
-  const cols = withPassword ? 'id, user_name, email, pass, role' :
-                              'id, user_name, email, role';
+  const cols = withPassword ? 'id, username, email, pass, role' :
+                              'id, username, email, role';
   const {data, error} = await supabase.from('accounts')
                             .select(cols)
                             .eq('email', email)
@@ -30,8 +30,8 @@ async function findByEmail(email, withPassword = false) {
 
 async function findById(id, withPassword = false) {
   const supabase = getSupabase();
-  const cols = withPassword ? 'id, user_name, email, pass, role' :
-                              'id, user_name, email, role';
+  const cols = withPassword ? 'id, username, email, pass, role' :
+                              'id, username, email, role';
   const {data, error} =
       await supabase.from('accounts').select(cols).eq('id', id).maybeSingle();
   if (error) throw error;
