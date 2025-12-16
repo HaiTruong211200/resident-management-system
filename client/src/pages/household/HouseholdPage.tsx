@@ -255,11 +255,11 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
                   className="w-full p-2 border border-slate-300 rounded-lg
                focus:ring-2 focus:ring-blue-500 focus:border-blue-500
                outline-none bg-white"
-                  value={formData.householdHeaderId ?? ""}
+                  value={formData.householdHeadId ?? ""}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      householdHeaderId: Number(e.target.value),
+                      householdHeadId: Number(e.target.value),
                     })
                   }
                 >

@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { User, Lock, Mail, CheckCircle2 } from "lucide-react";
+import toast from "react-hot-toast";
 
 export const LoginPage: React.FC = () => {
-  const { login, showToast } = useAppContext();
+  const { login } = useAppContext();
   const navigate = useNavigate();
 
   const [isSignUpActive, setIsSignUpActive] = useState(false);
@@ -53,16 +54,16 @@ export const LoginPage: React.FC = () => {
       !registerData.email ||
       !registerData.password
     ) {
-      showToast("Vui lòng điền đầy đủ thông tin", "error");
+      toast.error("Vui lòng điền đầy đủ thông tin");
       return;
     }
     if (registerData.password !== registerData.confirmPassword) {
-      showToast("Mật khẩu xác nhận không khớp", "error");
+      toast.error("Mật khẩu xác nhận không khớp");
       return;
     }
 
     // Simulate Registration
-    showToast("Đăng ký tài khoản thành công! Vui lòng đăng nhập.", "success");
+    toast.success("Đăng ký tài khoản thành công! Vui lòng đăng nhập.");
     setLoginData({ email: registerData.email, password: "" });
     setIsSignUpActive(false); // Switch back to login
   };

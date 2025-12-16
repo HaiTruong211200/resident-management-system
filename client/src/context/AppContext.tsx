@@ -226,13 +226,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     return households.map((h) => {
       let ownerName = "";
 
-      // Cách 1: dùng householdHeaderId (CHUẨN NHẤT)
-      if (h.householdHeaderId) {
-        const head = residents.find((r) => r.id === h.householdHeaderId);
+      // Cách 1: dùng householdHeadId (CHUẨN NHẤT)
+      if (h.householdHeadId) {
+        const head = residents.find((r) => r.id === h.householdHeadId);
         ownerName = head?.fullName || "";
       }
 
-      // Cách 2 (fallback): relationship_to_head === "Chủ hộ"
+      // Cách 2 (fallback): relationshipToHead === "Chủ hộ"
       if (!ownerName) {
         const head = residents.find(
           (r) => r.householdId === h.id && r.relationshipToHead === "Chủ hộ"

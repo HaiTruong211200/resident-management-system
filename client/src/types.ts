@@ -24,12 +24,13 @@ export interface User {
 // Hộ khẩu (Household)
 export interface Household {
   id: string; // Mã hộ (integer in schema, string here for uuid)
-  householdHeaderId: number; // Mã hộ cũ (Legacy/Extra)
+  householdHeadId: number; // ID of household head
   ownerName?: string; // Tên chủ hộ (Not in schema, useful for UI)
   houseNumber: string; // Số nhà
   street: string; // Đường phố (Ấp)
   ward: string; // Phường (Xã, Thị trấn)
   district: string; // Quận (Huyện)
+  memberCount?: number; // Number of members in household
   areaCode?: string; // Khu vực/Tổ dân phố (Legacy/Extra)
 }
 
@@ -56,12 +57,13 @@ export interface Resident {
   previousAddress?: string; // Địa chỉ trước khi chuyển đến
   relationshipToHead: string; // Quan hệ với chủ hộ
 
+  deletedAt?: string; // Soft delete timestamp
   alias?: string; // Bí danh
 }
 
 // Loại khoản thu (PaymentType)
 export interface PaymentType {
-  id: string; // payment_type_id
+  id: string; // paymentTypeId
   name: string;
   paymentType: FeeCategory; // type Enum
   amountPerPerson?: number; // amount_per_person (nullable)
@@ -74,7 +76,7 @@ export interface PaymentType {
 
 // Giao dịch nộp tiền (HouseholdPayment)
 export interface HouseholdPayment {
-  id: string; // payment_id
+  id: string; // paymentId
   householdId: string; // FK
   paymentTypeId: string; // FK to PaymentType
 

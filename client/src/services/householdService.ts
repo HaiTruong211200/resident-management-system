@@ -12,22 +12,21 @@ export const HouseholdService = {
 
   addHousehold(data: Household) {
     return api.post("/households", {
-      id: data.id,
-      householdHeaderId: data.householdHeaderId, // Mã hộ cũ (Legacy/Extra)
-      houseNumber: data.houseNumber, // Số nhà
-      street: data.street, // Đường phố (Ấp)
-      ward: data.ward, // Phường (Xã, Thị trấn)
-      district: data.district, // Quận (Huyện)
+      householdHeadId: data.householdHeadId,
+      houseNumber: data.houseNumber,
+      street: data.street,
+      ward: data.ward,
+      district: data.district,
     });
   },
 
   updateHousehold(data: Household) {
     return api.put(`/households/${data.id}`, {
-      householdHeaderId: data.householdHeaderId, // Mã hộ cũ (Legacy/Extra)
-      houseNumber: data.houseNumber, // Số nhà
-      street: data.street, // Đường phố (Ấp)
-      ward: data.ward, // Phường (Xã, Thị trấn)
-      district: data.district, // Quận (Huyện)
+      householdHeadId: data.householdHeadId,
+      houseNumber: data.houseNumber,
+      street: data.street,
+      ward: data.ward,
+      district: data.district,
     });
   },
 

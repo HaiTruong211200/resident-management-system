@@ -141,7 +141,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
         const params = new URLSearchParams();
         params.set("page", String(page));
         params.set("limit", String(limit));
-        if (filterHouseholdId) params.set("household_id", filterHouseholdId);
+        if (filterHouseholdId) params.set("householdId", filterHouseholdId);
 
         const resp = await fetch(
           `${SERVER_URL}/api/residents?${params.toString()}`
@@ -941,7 +941,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                       (
                       {
                         getHouseholdInfo(viewingItem.householdId)
-                          ?.householdHeaderId
+                          ?.householdHeadId
                       }
                       )
                     </span>
