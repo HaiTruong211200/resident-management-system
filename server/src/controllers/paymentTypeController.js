@@ -11,13 +11,26 @@ const {
 
 async function createPaymentType(req, res) {
   const errors = validationResult(req);
-  if (!errors.isEmpty()) return validationFailed(res, errors.array());
+  if (!errors.isEmpty()) {
+    console.log('Validation errors:', errors.array());
+    console.log('Request body:', req.body);
+    return validationFailed(res, errors.array());
+  }
   try {
-    const payload =
-        req.body;  // {name, pass, type, amount_per_person?, date_created?}
+    const payload = {
+      name: req.body.name,
+      type: req.body.paymentType,
+      pass: req.body.pass,
+      amountPerPerson: req.body.amountPerPerson,
+      createdAt: req.body.createdAt,
+      startDate: req.body.startDate,
+      dateExpired: req.body.dateExpired,
+      description: req.body.description,
+    };
+
     const pt = await PaymentType.create(payload);
 
-    if (pt.type === 'mandatory') {
+    if (pt.type === 'Bắt buộc') {
       const households = await Household.getAllHouseholds();
 
       for (const household of households) {
@@ -26,7 +39,7 @@ async function createPaymentType(req, res) {
           householdId: household.id,
           paymentTypeId: pt.paymentTypeId,
           amountPaid: 0,
-          status: 'pending',
+          status: 'Chưa đóng',
           startDate: payload.startDate,
           dueDate: payload.dateExpired || pt.dateExpired,
         });
@@ -83,11 +96,20 @@ async function updatePaymentType(req, res) {
   if (!errors.isEmpty()) return validationFailed(res, errors.array());
 
   try {
-    const payload = req.body;
+    const payload = {
+      name: req.body.name,
+      type: req.body.paymentType,
+      amountPerPerson: req.body.amountPerPerson,
+      dateCreated: req.body.createdAt,
+      dateStarted: req.body.startDate,
+      dateExpired: req.body.dateExpired,
+      description: req.body.description,
+    };
+
     console.log('Update payload:', payload);
     const pt = await PaymentType.update(id, payload);
 
-    if (pt.type === 'mandatory') {
+    if (pt.type === 'Bắt buộc') {
       const households = await Household.getAllHouseholds();
 
       for (const household of households) {

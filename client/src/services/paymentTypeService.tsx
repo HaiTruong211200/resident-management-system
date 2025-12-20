@@ -1,17 +1,34 @@
 import api from "../lib/api";
 import { PaymentType } from "../types";
 
+// Helper to map backend response to frontend type
+const mapPaymentType = (data: any): PaymentType => ({
+  ...data,
+  id: data.paymentTypeId?.toString() || data.id,
+  paymentType: data.type || data.paymentType,
+});
+
 export const PaymentTypeService = {
-  getPaymentTypes(params?: { page?: number; limit?: number }) {
-    return api.get("/payment-types", { params });
+  async getPaymentTypes(params?: { page?: number; limit?: number }) {
+    const response = await api.get("/payment-types", { params });
+    // Map paymentTypeId to id
+    if (response.data.data.paymentTypes) {
+      response.data.data.paymentTypes = response.data.data.paymentTypes.map(mapPaymentType);
+    }
+    return response;
   },
 
-  getPaymentTypeById(id: string) {
-    return api.get(`/payment-types/${id}`);
+  async getPaymentTypeById(id: string) {
+    const response = await api.get(`/payment-types/${id}`);
+    // Map paymentTypeId to id
+    if (response.data.data.paymentType) {
+      response.data.data.paymentType = mapPaymentType(response.data.data.paymentType);
+    }
+    return response;
   },
 
-  addPaymentType(data: PaymentType) {
-    return api.post("/payment-types", {
+  async addPaymentType(data: PaymentType) {
+    const response = await api.post("/payment-types", {
       name: data.name,
       paymentType: data.paymentType, // enum bắt buộc
       amountPerPerson: data.amountPerPerson,
@@ -20,11 +37,16 @@ export const PaymentTypeService = {
       startDate: data.startDate,
       dateExpired: data.dateExpired,
     });
+    // Map paymentTypeId to id
+    if (response.data.data.paymentType) {
+      response.data.data.paymentType = mapPaymentType(response.data.data.paymentType);
+    }
+    return response;
   },
 
-  updatePaymentType(data: PaymentType) {
+  async updatePaymentType(data: PaymentType) {
     console.log("Updating PaymentType:", data);
-    return api.patch(`/payment-types/${data.id}`, {
+    const response = await api.patch(`/payment-types/${data.id}`, {
       name: data.name,
       paymentType: data.paymentType,
       amountPerPerson: data.amountPerPerson,
@@ -33,6 +55,11 @@ export const PaymentTypeService = {
       startDate: data.startDate,
       dateExpired: data.dateExpired,
     });
+    // Map paymentTypeId to id
+    if (response.data.data.paymentType) {
+      response.data.data.paymentType = mapPaymentType(response.data.data.paymentType);
+    }
+    return response;
   },
 
   deletePaymentType(id: string) {

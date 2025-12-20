@@ -25,6 +25,9 @@ router.post(
     ],
     householdController.createHousehold);
 
+router.delete(
+    '/:id', [param('id').isString()], householdController.deleteHousehold);
+
 router.put(
     '/:id', [param('id').isString()], householdController.updateHousehold);
 

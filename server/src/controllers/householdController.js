@@ -6,6 +6,7 @@ const {
   searchHouseholds,
   getAllHouseholds,
   updateNumberCount,
+  deleteById: deleteHouseholdDAO
 } = require('../models/Household');
 const {
   findById: findResidentById,
@@ -135,6 +136,34 @@ async function searchHouseholdsHandler(req, res) {
   }
 }
 
+async function deleteHouseholdHandler(req, res) {
+  const id = req.params.id;
+  try {
+    const household = await findHouseholdById(id);
+    if (!household) {
+      return sendError(res, {
+        status: 404,
+        message: 'Household not found',
+        code: 'HOUSEHOLD_NOT_FOUND',
+      });
+    }
+
+    if (household.memberCount > 0) {
+      return sendError(res, {
+        status: 400,
+        message: 'Cannot delete household with members',
+        code: 'HOUSEHOLD_NOT_EMPTY',
+      });
+    }
+
+    await deleteHouseholdDAO(id);
+    return sendSuccess(res, {message: 'Household deleted successfully'});
+  } catch (err) {
+    console.error(err);
+    return sendError(res);
+  }
+}
+
 async function getAllHouseholdsHandler(req, res) {
   try {
     const households = await getAllHouseholds();
@@ -149,4 +178,5 @@ module.exports = {
   createHousehold : createHouseholdHandler, updateHousehold,
   searchHouseholds : searchHouseholdsHandler,
   getAllHouseholds : getAllHouseholdsHandler,
+  deleteHousehold : deleteHouseholdHandler,
 };

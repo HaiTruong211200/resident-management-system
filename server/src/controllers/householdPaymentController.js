@@ -1,47 +1,71 @@
-const { validationResult } = require("express-validator");
-const HouseholdPayment = require("../models/HouseholdPayment");
-const { findById: findHouseholdById } = require("../models/Household");
+const {validationResult} = require('express-validator');
+const HouseholdPayment = require('../models/HouseholdPayment');
+const {findById: findHouseholdById} = require('../models/Household');
+const {findById: findPaymentTypeById} = require('../models/PaymentType');
 const {
   sendSuccess,
   sendError,
   validationFailed,
-} = require("../utils/response");
+} = require('../utils/response');
 
 async function createHouseholdPayment(req, res) {
   const errors = validationResult(req);
-  if (!errors.isEmpty()) return validationFailed(res, errors.array());
+  if (!errors.isEmpty()) {
+    console.log('Validation errors:', errors.array());
+    console.log('Request body:', req.body);
+    return validationFailed(res, errors.array());
+  }
   try {
-    const { householdId, paymentTypeId, amountPaid, paymentDate, notes } =
-      req.body;
+    const {
+      householdId,
+      paymentTypeId,
+      amountPaid,
+      status,
+      startDate,
+      paymentDate,
+      dueDate,
+      notes
+    } = req.body;
 
     const h = await findHouseholdById(householdId);
     if (!h)
       return sendError(res, {
         status: 404,
-        message: "Household not found",
-        code: "HOUSEHOLD_NOT_FOUND",
+        message: 'Household not found',
+        code: 'HOUSEHOLD_NOT_FOUND',
+      });
+
+    const pt = await findPaymentTypeById(paymentTypeId);
+    if (!pt)
+      return sendError(res, {
+        status: 404,
+        message: 'Payment type not found',
+        code: 'PAYMENT_TYPE_NOT_FOUND',
       });
 
     const payment = await HouseholdPayment.create({
       householdId,
       paymentTypeId,
       amountPaid,
+      status,
+      startDate,
       paymentDate,
+      dueDate,
       notes,
     });
-    return sendSuccess(res, { payment }, { status: 201 });
+    return sendSuccess(res, {payment}, {status: 201});
   } catch (err) {
     console.error(err);
     return sendError(res);
   }
 }
 
-module.exports = { createHouseholdPayment };
+module.exports = {createHouseholdPayment};
 
 async function listHouseholdPayments(_req, res) {
   try {
     const payments = await HouseholdPayment.list();
-    return sendSuccess(res, { payments });
+    return sendSuccess(res, {payments});
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -55,11 +79,11 @@ async function getHouseholdPaymentById(req, res) {
     if (!payment) {
       return sendError(res, {
         status: 404,
-        message: "Payment not found",
-        code: "PAYMENT_NOT_FOUND",
+        message: 'Payment not found',
+        code: 'PAYMENT_NOT_FOUND',
       });
     }
-    return sendSuccess(res, { payment });
+    return sendSuccess(res, {payment});
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -69,19 +93,19 @@ async function getHouseholdPaymentById(req, res) {
 async function updateHouseholdPayment(req, res) {
   const id = req.params.id;
   const errors = validationResult(req);
-  console.log("Validation errors:", errors.array());
+  console.log('Validation errors:', errors.array());
   if (!errors.isEmpty()) return validationFailed(res, errors.array());
   try {
     const payload = req.body;
-    console.log("Update payload:", payload);
+    console.log('Update payload:', payload);
     const payment = await HouseholdPayment.update(id, payload);
     if (!payment)
       return sendError(res, {
         status: 404,
-        message: "Household payment not found",
-        code: "HOUSEHOLD_PAYMENT_NOT_FOUND",
+        message: 'Household payment not found',
+        code: 'HOUSEHOLD_PAYMENT_NOT_FOUND',
       });
-    return sendSuccess(res, { payment });
+    return sendSuccess(res, {payment});
   } catch (err) {
     console.error(err);
     return sendError(res);

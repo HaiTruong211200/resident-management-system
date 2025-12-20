@@ -1,6 +1,14 @@
 import api from "../lib/api";
 import { HouseholdPayment } from "../types";
 
+// Helper to map backend response to frontend type
+const mapHouseholdPayment = (data: any): HouseholdPayment => ({
+  ...data,
+  id: data.paymentId?.toString() || data.id,
+  paymentTypeId: data.paymentTypeId?.toString() || data.paymentTypeId,
+  householdId: data.householdId?.toString() || data.householdId,
+});
+
 /**
  * Service quản lý các khoản thu / đóng phí của hộ dân
  */
@@ -8,7 +16,7 @@ export const HouseholdPaymentService = {
   /**
    * Lấy danh sách các khoản thanh toán
    */
-  getHouseholdPayments(params?: {
+  async getHouseholdPayments(params?: {
     page?: number;
     limit?: number;
     householdId?: string;
@@ -16,25 +24,35 @@ export const HouseholdPaymentService = {
     status?: string;
     category?: string;
   }) {
-    return api.get("/household-payments", { params });
+    const response = await api.get("/household-payments", { params });
+    // Map paymentId to id
+    if (response.data.data.payments) {
+      response.data.data.payments = response.data.data.payments.map(mapHouseholdPayment);
+    }
+    return response;
   },
 
   /**
    * Lấy chi tiết 1 khoản thanh toán theo id
    */
-  getHouseholdPaymentById(id: string) {
-    return api.get(`/household-payments/${id}`);
+  async getHouseholdPaymentById(id: string) {
+    const response = await api.get(`/household-payments/${id}`);
+    // Map paymentId to id
+    if (response.data.data.payment) {
+      response.data.data.payment = mapHouseholdPayment(response.data.data.payment);
+    }
+    return response;
   },
 
   /**
    * Tạo mới khoản thanh toán
    */
-  addHouseholdPayment(data: HouseholdPayment) {
-    return api.post("/household-payments", {
-      paymentTypeId: data.paymentTypeId,
-      householdId: data.householdId,
-      amountPaid: data.amountPaid,
-      amountExpected: data.amountExpected,
+  async addHouseholdPayment(data: HouseholdPayment) {
+    const response = await api.post("/household-payments", {
+      paymentTypeId: Number(data.paymentTypeId),
+      householdId: Number(data.householdId),
+      amountPaid: Number(data.amountPaid),
+      amountExpected: Number(data.amountExpected || 0),
       status: data.status,
       category: data.category,
       startDate: data.startDate,
@@ -43,21 +61,31 @@ export const HouseholdPaymentService = {
       payerName: data.payerName,
       notes: data.notes,
     });
+    // Map paymentId to id
+    if (response.data.data.payment) {
+      response.data.data.payment = mapHouseholdPayment(response.data.data.payment);
+    }
+    return response;
   },
 
   /**
    * Cập nhật khoản thanh toán
    */
-  updateHouseholdPayment(data: HouseholdPayment) {
-    return api.patch(`/household-payments/${data.id}`, {
-      amountPaid: data.amountPaid,
-      amountExpected: data.amountExpected,
+  async updateHouseholdPayment(data: HouseholdPayment) {
+    const response = await api.patch(`/household-payments/${data.id}`, {
+      amountPaid: Number(data.amountPaid),
+      amountExpected: Number(data.amountExpected || 0),
       status: data.status,
       startDate: data.startDate,
       paymentDate: data.paymentDate,
       dueDate: data.dueDate,
       notes: data.notes,
     });
+    // Map paymentId to id
+    if (response.data.data.payment) {
+      response.data.data.payment = mapHouseholdPayment(response.data.data.payment);
+    }
+    return response;
   },
 
   /**

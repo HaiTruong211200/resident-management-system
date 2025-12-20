@@ -64,6 +64,14 @@ async function deleteMany() {
       await supabase.from('households').delete().not('id', 'is', null);
   if (error) throw error;
 }
+
+async function deleteById(id) {
+  const supabase = getSupabase();
+  const {error} = await supabase.from('households').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
 async function getAllHouseholds() {
   const supabase = getSupabase();
   const {data, error} = await supabase.from('households')
@@ -112,6 +120,7 @@ module.exports = {
   findById,
   searchHouseholds,
   deleteMany,
+  deleteById,
   getAllHouseholds,
   updateNumberCount,
   softDeleteHousehold,
