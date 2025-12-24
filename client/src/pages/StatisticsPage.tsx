@@ -1,0 +1,265 @@
+import React, { useEffect, useState } from "react";
+import { Home, Users, DollarSign, TrendingUp, Loader } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { StatisticsService, DashboardStatistics, AgeDistribution, MonthlyCollection } from "../services/statisticsService";
+
+interface AgeChartData {
+  name: string;
+  count: number;
+}
+
+// Mock data khi API không khả dụng
+const MOCK_STATISTICS: DashboardStatistics = {
+  totalHouseholds: 3,
+  totalResidents: 4,
+  totalFees: 716000,
+  totalFunds: 0,
+  totalCollection: 716000,
+  ageDistribution: {
+    "0-17": 1,
+    "18-30": 0,
+    "31-45": 1,
+    "46-60": 2,
+    "60+": 0,
+  },
+  monthlyCollection: [
+    { month: "T1", fees: 4000, funds: 2000, total: 6000 },
+    { month: "T2", fees: 3000, funds: 1500, total: 4500 },
+    { month: "T3", fees: 2000, funds: 1000, total: 3000 },
+    { month: "T4", fees: 2780, funds: 1390, total: 4170 },
+    { month: "T5", fees: 1890, funds: 945, total: 2835 },
+    { month: "T6", fees: 2390, funds: 1195, total: 3585 },
+    { month: "T7", fees: 3490, funds: 1745, total: 5235 },
+    { month: "T8", fees: 4000, funds: 2000, total: 6000 },
+    { month: "T9", fees: 3000, funds: 1500, total: 4500 },
+    { month: "T10", fees: 2000, funds: 1000, total: 3000 },
+    { month: "T11", fees: 2780, funds: 1390, total: 4170 },
+    { month: "T12", fees: 1890, funds: 945, total: 2835 },
+  ],
+  recentTransactions: [],
+};
+
+export const StatisticsPage: React.FC = () => {
+  const [loading, setLoading] = useState(true);
+  const [statistics, setStatistics] = useState<DashboardStatistics | null>(null);
+  const [ageChartData, setAgeChartData] = useState<AgeChartData[]>([]);
+  const [feeData, setFeeData] = useState<MonthlyCollection[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [useMockData, setUseMockData] = useState(false);
+
+  useEffect(() => {
+    const fetchStatistics = async () => {
+      try {
+        setLoading(true);
+        const data = await StatisticsService.getDashboardStatistics();
+        setStatistics(data);
+
+        // Transform age distribution data for bar chart
+        if (data.ageDistribution) {
+          const ageChartTransformed: AgeChartData[] = [
+            { name: "Mầm non (0-5)", count: 0 },
+            { name: "Học sinh (6-18)", count: data.ageDistribution["0-17"] || 0 },
+            { name: "Thanh niên (19-35)", count: data.ageDistribution["18-30"] || 0 },
+            { name: "Trung niên (36-60)", count: (data.ageDistribution["31-45"] || 0) + (data.ageDistribution["46-60"] || 0) },
+            { name: "Cao tuổi (>60)", count: data.ageDistribution["60+"] || 0 },
+          ];
+          setAgeChartData(ageChartTransformed);
+        }
+
+        // Set fee data
+        if (data.monthlyCollection) {
+          setFeeData(data.monthlyCollection);
+        }
+
+        setError(null);
+        setUseMockData(false);
+      } catch (err) {
+        console.error("Error fetching statistics:", err);
+        // Fallback to mock data
+        setStatistics(MOCK_STATISTICS);
+        setUseMockData(true);
+
+        // Transform mock age distribution data
+        const ageChartTransformed: AgeChartData[] = [
+          { name: "Mầm non (0-5)", count: 0 },
+          { name: "Học sinh (6-18)", count: MOCK_STATISTICS.ageDistribution["0-17"] || 0 },
+          { name: "Thanh niên (19-35)", count: MOCK_STATISTICS.ageDistribution["18-30"] || 0 },
+          { name: "Trung niên (36-60)", count: (MOCK_STATISTICS.ageDistribution["31-45"] || 0) + (MOCK_STATISTICS.ageDistribution["46-60"] || 0) },
+          { name: "Cao tuổi (>60)", count: MOCK_STATISTICS.ageDistribution["60+"] || 0 },
+        ];
+        setAgeChartData(ageChartTransformed);
+        setFeeData(MOCK_STATISTICS.monthlyCollection);
+
+        setError(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStatistics();
+  }, []);
+
+  const formatCurrency = (value: number): string => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(value);
+  };
+
+  const stats = [
+    {
+      icon: Home,
+      label: "Tổng hộ khẩu",
+      value: statistics?.totalHouseholds || 0,
+      bgColor: "bg-blue-50",
+      iconColor: "text-blue-600",
+      borderColor: "border-blue-200",
+    },
+    {
+      icon: Users,
+      label: "Tổng nhân khẩu",
+      value: statistics?.totalResidents || 0,
+      bgColor: "bg-purple-50",
+      iconColor: "text-purple-600",
+      borderColor: "border-purple-200",
+    },
+    {
+      icon: DollarSign,
+      label: "Tổng thu phí",
+      value: formatCurrency(statistics?.totalFees || 0),
+      bgColor: "bg-green-50",
+      iconColor: "text-green-600",
+      borderColor: "border-green-200",
+    },
+    {
+      icon: TrendingUp,
+      label: "Tổng thu quỹ",
+      value: formatCurrency(statistics?.totalFunds || 0),
+      bgColor: "bg-orange-50",
+      iconColor: "text-orange-600",
+      borderColor: "border-orange-200",
+    },
+  ];
+
+  return (
+    <div className="p-8 max-w-7xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-800">Tổng quan</h1>
+        <p className="text-slate-500 mt-1">Xem tổng quan các thông tin quan trọng</p>
+        {useMockData && (
+          <p className="text-amber-600 text-sm mt-2">
+            ℹ️ Hiển thị dữ liệu mẫu (cần setup database để hiển thị dữ liệu thực)
+          </p>
+        )}
+      </div>
+
+      {/* Loading Spinner */}
+      {loading && (
+        <div className="flex justify-center items-center min-h-96">
+          <div className="flex flex-col items-center gap-4">
+            <Loader size={48} className="text-blue-600 animate-spin" />
+            <p className="text-slate-600 font-medium">Đang tải dữ liệu...</p>
+          </div>
+        </div>
+      )}
+
+      {!loading && (
+        <>
+          {/* Stats Grid */}
+          <div className="grid grid-cols-4 gap-6 mb-8">
+            {stats.map((stat, index) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={index}
+                  className={`${stat.bgColor} border ${stat.borderColor} rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div
+                      className={`p-3 rounded-xl bg-white border ${stat.borderColor}`}
+                    >
+                      <Icon size={24} className={stat.iconColor} />
+                    </div>
+                  </div>
+                  <p className="text-slate-600 text-sm font-medium mb-1">
+                    {stat.label}
+                  </p>
+                  <p className={`text-2xl font-bold ${stat.iconColor}`}>
+                    {stat.value}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Charts Grid */}
+          <div className="grid grid-cols-2 gap-6">
+            {/* Age Statistics Chart */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-800 mb-6">
+                Thống kê độ tuổi cư dân
+              </h2>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={ageChartData} margin={{ bottom: 60, left: 0, right: 0, top: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#a855f7" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Fee Comparison Chart */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-800 mb-6">
+                So sánh thu phí và thu quỹ trong 12 tháng
+              </h2>
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={feeData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="fees"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    name="Thu phí"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="funds"
+                    stroke="#16a34a"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="Thu quỹ"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};

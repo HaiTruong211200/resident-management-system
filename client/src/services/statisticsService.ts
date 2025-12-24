@@ -55,7 +55,10 @@ export const StatisticsService = {
    */
   async getDashboardStatistics() {
     const response = await api.get("/statistics/dashboard");
-    return response;
+    // Backend trả về: {data: {statistics: {...}}}
+    // Axios wraps nó thành: {data: {data: {statistics: {...}}}, status: 200, ...}
+    const statistics = response.data.data?.statistics || response.data.statistics || response.data;
+    return statistics;
   },
 
   /**
