@@ -18,6 +18,7 @@ const app = express();
 
 const PORT = process.env.PORT || 4000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 (async () => {
   try {
@@ -32,7 +33,20 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
   app.set('trust proxy', 1);
   app.use(helmet());
-  app.use(cors({origin: CLIENT_URL, credentials: true}));
+  app.use(cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (origin === CLIENT_URL) return callback(null, true);
+
+      if (NODE_ENV !== 'production') {
+        const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+        if (isLocal) return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  }));
   app.use(express.json({limit: '10kb'}));
   app.use(morgan('dev'));
 

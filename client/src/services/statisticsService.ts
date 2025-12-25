@@ -54,7 +54,7 @@ export const StatisticsService = {
    * Lấy thống kê tổng quan cho dashboard
    */
   async getDashboardStatistics() {
-    const response = await api.get("/statistics/dashboard");
+    const response = await api.get("/statistics/dashboard", { timeout: 30000 });
     // Backend trả về: {data: {statistics: {...}}}
     // Axios wraps nó thành: {data: {data: {statistics: {...}}}, status: 200, ...}
     const statistics = response.data.data?.statistics || response.data.statistics || response.data;
