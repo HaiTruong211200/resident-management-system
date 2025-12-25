@@ -5,6 +5,7 @@ import {
   Home,
   DollarSign,
   Settings,
+  BarChart3,
 } from "lucide-react";
 
 interface SidebarProps {

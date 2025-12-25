@@ -10,6 +10,7 @@ import { LoginPage } from "../pages/auth/LoginPage";
 import { HouseholdPage } from "../pages/household/HouseholdPage";
 import { ResidentPage } from "../pages/resident/ResidentPage";
 import { FeePage } from "../pages/fees/FeePage";
+import { StatisticsPage } from "../pages/StatisticsPage";
 
 import { Unknown } from "../pages/unknown/Unknown";
 
@@ -89,6 +90,7 @@ export const AppRoutes = () => {
           }
         />
         <Route path="fees" element={<FeePage />} />
+        <Route path="dashboard" element={<StatisticsPage />} />
       </Route>
 
       {/* Redirect unknown routes */}

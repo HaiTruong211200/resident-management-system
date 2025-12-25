@@ -5,19 +5,17 @@ async function getDashboardStatistics(req, res) {
   try {
     const supabase = getSupabase();
 
-    // Get total households (excluding soft deleted)
+    // Get total households
     const {count: totalHouseholds, error: householdsError} =
         await supabase.from('households')
-            .select('*', {count: 'exact', head: true})
-            .is('deletedAt', null);
+            .select('id', {count: 'exact', head: true});
 
     if (householdsError) throw householdsError;
 
-    // Get total residents (excluding soft deleted)
+    // Get total residents
     const {count: totalResidents, error: residentsError} =
         await supabase.from('residents')
-            .select('*', {count: 'exact', head: true})
-            .is('deletedAt', null);
+            .select('id', {count: 'exact', head: true});
 
     if (residentsError) throw residentsError;
 
@@ -28,7 +26,7 @@ async function getDashboardStatistics(req, res) {
     if (ptError) throw ptError;
 
     const paymentTypeMap = {};
-    paymentTypes.forEach((pt) => {
+    paymentTypes?.forEach((pt) => {
       paymentTypeMap[pt.paymentTypeId] = pt.type;
     });
 
@@ -41,7 +39,7 @@ async function getDashboardStatistics(req, res) {
     let totalFees = 0;
     let totalFunds = 0;
 
-    payments.forEach((payment) => {
+    payments?.forEach((payment) => {
       const amount = parseFloat(payment.amountPaid) || 0;
       const type = paymentTypeMap[payment.paymentTypeId];
 
@@ -56,7 +54,6 @@ async function getDashboardStatistics(req, res) {
     const {data: residentsWithAge, error: ageError} =
         await supabase.from('residents')
             .select('dateOfBirth')
-            .is('deletedAt', null)
             .not('dateOfBirth', 'is', null);
 
     if (ageError) throw ageError;
@@ -94,10 +91,11 @@ async function getDashboardStatistics(req, res) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
-      const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+      const monthStr = `T${String(month).padStart(2, '0')}`;
 
       const startDate =
           new Date(year, month - 1, 1).toISOString().split('T')[0];
+
       const endDate =
           new Date(year, month, 0).toISOString().split('T')[0];  // Last day
 
