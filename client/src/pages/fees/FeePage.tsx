@@ -462,7 +462,7 @@ export const FeePage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-teal-150">
                 {currentTableData.map((pay) => {
-                  const hh = households.find((h) => h.id === pay.householdId);
+                  const hh = households.find((h) => h.id == pay.householdId);
                   const camp = paymentTypes.find(
                     (c) => c.id === pay.paymentTypeId
                   );

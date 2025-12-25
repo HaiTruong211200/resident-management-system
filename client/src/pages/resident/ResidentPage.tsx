@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { Resident, Gender } from "../../types";
 import {
@@ -58,6 +59,7 @@ export const RELATIONSHIP_OPTIONS = [
 interface ResidentPageProps {
   filterHouseholdId?: string | null;
   onBack?: () => void;
+  onSelectHousehold?: (id: string) => void;
 }
 
 export const ResidentPage: React.FC<ResidentPageProps> = ({
@@ -86,6 +88,11 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
   // State for View Details Modal
   const [viewingItem, setViewingItem] = useState<Resident | null>(null);
 
+  // route param (when navigated from Household page)
+  const paramsRoute = useParams<{ householdId?: string }>();
+  const routeHouseholdId = paramsRoute.householdId;
+  const effectiveHouseholdId = filterHouseholdId ?? routeHouseholdId ?? null;
+
   // Apply client-side sorting then filtering/searching
   const sortedResidents = [...residentsData].sort((a, b) => {
     const col = sortBy;
@@ -108,8 +115,8 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
   });
 
   const filteredResidents = sortedResidents.filter((r) => {
-    const matchesFilter = filterHouseholdId
-      ? r.householdId === filterHouseholdId
+    const matchesFilter = effectiveHouseholdId
+      ? r.householdId === effectiveHouseholdId
       : true;
     const matchesSearch =
       r.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -133,40 +140,37 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
   };
 
   // Fetch residents from backend when page, limit or household filter changes
-  useEffect(() => {
-    let abort = false;
-    async function fetchResidents() {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams();
-        params.set("page", String(page));
-        params.set("limit", String(limit));
-        if (filterHouseholdId) params.set("householdId", filterHouseholdId);
+  const fetchResidents = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("limit", String(limit));
+      if (effectiveHouseholdId) params.set("householdId", effectiveHouseholdId);
 
-        const resp = await fetch(
-          `${SERVER_URL}/api/residents?${params.toString()}`
-        );
-        if (!resp.ok) throw new Error("Failed to fetch residents");
-        const json = await resp.json();
-        if (abort) return;
-        const data = json?.data?.residents || [];
-        const meta = json?.data?.meta || {};
-        setResidentsData(data);
-        setTotal(meta.total || 0);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (!abort) setLoading(false);
-      }
+      const resp = await fetch(
+        `${SERVER_URL}/api/residents?${params.toString()}`
+      );
+      if (!resp.ok) throw new Error("Failed to fetch residents");
+      const json = await resp.json();
+      const data = json?.data?.residents || [];
+      const meta = json?.data?.meta || {};
+      setResidentsData(data);
+      setTotal(meta.total || 0);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-    fetchResidents();
-    return () => {
-      abort = true;
-    };
-  }, [page, limit, filterHouseholdId]);
+  };
 
-  const activeHousehold = filterHouseholdId
-    ? households.find((h) => h.id === filterHouseholdId)
+  useEffect(() => {
+    fetchResidents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, limit, effectiveHouseholdId]);
+
+  const activeHousehold = effectiveHouseholdId
+    ? households.find((h) => h.id === effectiveHouseholdId)
     : null;
 
   const handleOpenModal = (item?: Resident) => {
@@ -175,12 +179,11 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
       setFormData(item);
     } else {
       setEditingItem(null);
-      setFormData({
+        setFormData({
         // id: `R${Date.now()}`, // Internal ID
-        householdId: filterHouseholdId || households[0]?.id || "",
+        householdId: effectiveHouseholdId || households[0]?.id || "",
         ethnicity: "Kinh",
         gender: "Nam",
-        relationshipToHead: "Thành viên",
         hometown: "",
         residenceRegistrationDate: new Date().toISOString().split("T")[0],
       });
@@ -188,17 +191,36 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      editResident({ ...editingItem, ...formData } as Resident);
-    } else {
-      addResident(formData as Resident);
+    try {
+      if (editingItem) {
+        await editResident({ ...editingItem, ...formData } as Resident);
+      } else {
+        await addResident(formData as Resident);
+      }
+      // Refresh list to reflect server state (new id, paging, etc.)
+      await fetchResidents();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsModalOpen(false);
     }
-    setIsModalOpen(false);
   };
 
   const getHouseholdInfo = (id: string) => households.find((h) => h.id === id);
+
+  const toInputDateString = (date?: Date | null) => {
+    if (!date) return "";
+    // Lưu ý: Nếu date là string ISO từ API, cần new Date(date) trước
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "";
+
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -264,7 +286,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 text-slate-500 text-sm uppercase font-semibold border-b border-slate-200">
               <tr className="text-slate-500">
-                {!filterHouseholdId && (
+                {!effectiveHouseholdId && (
                   <th className="px-6 py-4">
                     <button
                       onClick={() => toggleSort("householdId")}
@@ -295,7 +317,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                   key={resident.id}
                   className="hover:bg-blue-50/50 transition-colors"
                 >
-                  {!filterHouseholdId && (
+                  {!effectiveHouseholdId && (
                     <td className="px-6 py-4 font-mono text-sm text-slate-600/70">
                       {
                         households.find((h) => h.id === resident.householdId)
@@ -455,7 +477,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                     onChange={(e) =>
                       setFormData({ ...formData, householdId: e.target.value })
                     }
-                    disabled={!!filterHouseholdId}
+                    disabled={!!effectiveHouseholdId}
                   >
                     <option value="">Chọn hộ khẩu...</option>
                     {households.map((h) => (
@@ -471,7 +493,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                     Quan hệ với chủ hộ (*)
                   </label>
                   <select
-                    required
+                    // required
                     className="w-full p-2 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     value={formData.relationshipToHead || ""}
                     onChange={(e) =>
@@ -481,9 +503,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                       })
                     }
                   >
-                    <option value="" disabled>
-                      -- Chọn quan hệ --
-                    </option>
+                    <option value="">-- Chọn quan hệ --</option>
 
                     {RELATIONSHIP_OPTIONS.map((opt) => (
                       <option key={opt} value={opt}>

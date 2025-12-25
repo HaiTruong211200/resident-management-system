@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useAppContext } from "../../context/AppContext";
-import { Household } from "../../types";
+import { Household, Resident } from "../../types";
 import {
   Plus,
   Search,
@@ -41,17 +41,26 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
   };
   console.log("Households:", households);
 
-  const filteredHouseholds = households.filter(
-    (h) =>
-      h.ownerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      getFullAddress(h).toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredHouseholds = households.filter((h) => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return true;
+
+    const owner = (h.ownerName || "").toLowerCase();
+    const id = String(h.id ?? "").toLowerCase(); // 🔥 QUAN TRỌNG
+    const addr = (getFullAddress(h) || "").toLowerCase();
+
+    return owner.includes(q) || id.includes(q) || addr.includes(q);
+  });
+
+  const [eligibleResidents, setEligibleResidents] = useState<Resident[]>([]);
 
   const handleOpenModal = (item?: Household) => {
     if (item) {
       setEditingItem(item);
       setFormData(item);
+      console.log("Editing household:", item);
+      // For edit mode, show residents that belong to this household
+      setEligibleResidents(residents.filter((r) => r.householdId === item.id));
     } else {
       setEditingItem(null);
       setFormData({
@@ -64,6 +73,10 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
         // this is only used as a sensible default for the form
         ...(households[0] ? { id: households[0].id } : {}),
       });
+      // For create mode, list residents that are not marked as household head
+      setEligibleResidents(
+        residents.filter((r) => r.relationshipToHead !== "Chủ hộ")
+      );
       console.log("Default form data:", formData);
     }
     setIsModalOpen(true);
@@ -83,9 +96,7 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
   const countMembers = (householdId: string) =>
     residents.filter((r) => r.householdId === householdId).length;
 
-  const eligibleResidents = useMemo(() => {
-    return residents.filter((r) => r.relationshipToHead !== "Chủ hộ");
-  }, [residents]);
+  // Note: `eligibleResidents` is populated when opening the modal
 
   return (
     <div className="space-y-6">
@@ -230,7 +241,7 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
               className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4"
             >
               {/* Form fields same as before */}
-              <div className="col-span-1">
+              {/* <div className="col-span-1">
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Mã hộ khẩu (*)
                 </label>
@@ -245,7 +256,7 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
                   disabled={!!editingItem}
                   placeholder="VD: HK001"
                 />
-              </div>
+              </div> */}
               <div className="col-span-1">
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Tên chủ hộ (*)
@@ -262,6 +273,7 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
                       householdHeadId: Number(e.target.value),
                     })
                   }
+                  disabled={!!editingItem}
                 >
                   <option value="">-- Chọn chủ hộ --</option>
 
@@ -339,7 +351,7 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
                   placeholder="VD: Thanh Xuân"
                 />
               </div>
-              <div className="col-span-1">
+              {/* <div className="col-span-1">
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Khu vực / Tổ dân phố
                 </label>
@@ -352,7 +364,7 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
                   }
                   placeholder="Tùy chọn"
                 />
-              </div>
+              </div> */}
 
               <div className="col-span-2 mt-4 flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button

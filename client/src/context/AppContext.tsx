@@ -134,9 +134,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   // const addResident = (r: Resident) => setResidents([...residents, r]);
   const addResident = async (data: Resident) => {
     try {
+      console.log("hello");
+      console.log(typeof data.dateOfBirth);
       const resp = await ResidentService.addResident(data);
-      setResidents((prev) => [resp.data.data, ...prev]);
+      console.log("Add Resident response:", resp);
+      setResidents((prev) => [resp.data.data.resident, ...prev]);
       toast.success("Thêm cư dân thành công");
+      return resp.data.data.resident;
     } catch (err: any) {
       toast.error(err.message);
       throw err;
@@ -148,10 +152,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   // const deleteResident = (id: string) =>
   //   setResidents(residents.filter((r) => r.id !== id));
   const editResident = async (data: Resident) => {
+    console.log("Updating resident:", data);
+    console.log(residents);
     try {
       const resp = await ResidentService.updateResident(data);
+      console.log("Edit Resident response:", resp);
       setResidents((prev) =>
-        prev.map((r) => (r.id === data.id ? resp.data.data : r))
+        prev.map((r) => (r.id === data.id ? resp.data.data.resident : r))
       );
       toast.success("Cập nhật cư dân thành công");
     } catch (err: any) {

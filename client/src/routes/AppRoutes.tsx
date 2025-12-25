@@ -25,6 +25,13 @@ export const AppRoutes = () => {
   } = useAppContext();
 
   const handleHouseholdSelect = (id: string): void => {
+    if (!id || id === "") {
+      setHouseholdSelectedId(null);
+      setCurrentView(null);
+      navigate(`/residents`);
+      return;
+    }
+
     setHouseholdSelectedId(id);
     setCurrentView("residents");
     navigate(`/residents/${id}`);
@@ -73,7 +80,13 @@ export const AppRoutes = () => {
         />
         <Route
           path="residents/:householdId?"
-          element={<ResidentPage onBack={handleBack} />}
+          element={
+            <ResidentPage
+              onBack={handleBack}
+              filterHouseholdId={householdSelectedId}
+              onSelectHousehold={handleHouseholdSelect}
+            />
+          }
         />
         <Route path="fees" element={<FeePage />} />
       </Route>
