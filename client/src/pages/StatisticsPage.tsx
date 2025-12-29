@@ -359,7 +359,7 @@ export const StatisticsPage: React.FC = () => {
                     for (let i = 0; i <= 4; i++) {
                       const value = (maxValue / 4) * i;
                       const y = canvas.height - padding - (chartHeight / 4) * i;
-                      const label = (value / 1000000).toFixed(1) + 'M';
+                      const label = (value / 1000).toFixed(0) + 'K';
                       ctx.fillText(label, padding - 10, y + 4);
                     }
                   }}
