@@ -23,8 +23,11 @@ async function getDashboardStatistics(req, res) {
       // Tổng hộ khẩu
       supabase.from("households").select("id", { count: "exact", head: true }),
 
-      // Tổng nhân khẩu
-      supabase.from("residents").select("id", { count: "exact", head: true }),
+      // Tổng nhân khẩu (chỉ những người chưa bị xóa)
+      supabase
+        .from("residents")
+        .select("id", { count: "exact", head: true })
+        .is("deletedAt", null),
 
       // Các loại phí (để map tên/loại)
       supabase.from("paymentTypes").select("paymentTypeId, type"),
@@ -36,10 +39,11 @@ async function getDashboardStatistics(req, res) {
         .select("amountPaid, paymentTypeId, paymentDate")
         .order("paymentDate", { ascending: false }), // Order để lấy 10 giao dịch gần nhất luôn
 
-      // Lấy ngày sinh để tính độ tuổi
+      // Lấy ngày sinh để tính độ tuổi (chỉ những người chưa bị xóa)
       supabase
         .from("residents")
         .select("dateOfBirth")
+        .is("deletedAt", null)
         .not("dateOfBirth", "is", null),
     ]);
 
@@ -104,21 +108,28 @@ async function getDashboardStatistics(req, res) {
 
     // --- Xử lý Age Distribution ---
     const ageDistribution = {
-      "0-17": 0,
-      "18-30": 0,
-      "31-45": 0,
-      "46-60": 0,
+      "0-5": 0,
+      "6-18": 0,
+      "19-35": 0,
+      "36-60": 0,
       "60+": 0,
     };
 
     residentsAgeRes.data.forEach((resident) => {
-      const birthYear = new Date(resident.dateOfBirth).getFullYear();
-      const age = currentYear - birthYear;
+      const birthDate = new Date(resident.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      // Nếu chưa qua sinh nhật trong năm nay thì trừ 1 tuổi
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
 
-      if (age < 18) ageDistribution["0-17"]++;
-      else if (age <= 30) ageDistribution["18-30"]++;
-      else if (age <= 45) ageDistribution["31-45"]++;
-      else if (age <= 60) ageDistribution["46-60"]++;
+      if (age <= 5) ageDistribution["0-5"]++;
+      else if (age <= 18) ageDistribution["6-18"]++;
+      else if (age <= 35) ageDistribution["19-35"]++;
+      else if (age <= 60) ageDistribution["36-60"]++;
       else ageDistribution["60+"]++;
     });
 

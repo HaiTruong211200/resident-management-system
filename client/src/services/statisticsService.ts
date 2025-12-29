@@ -1,10 +1,10 @@
 import api from "../lib/api";
 
 export interface AgeDistribution {
-  "0-17": number;
-  "18-30": number;
-  "31-45": number;
-  "46-60": number;
+  "0-5": number;
+  "6-18": number;
+  "19-35": number;
+  "36-60": number;
   "60+": number;
 }
 
@@ -50,7 +50,7 @@ export interface HouseholdStatistics {
  * Service quản lý các API thống kê
  */
 // Simple in-memory cache to avoid refetching when switching pages
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 0; // No cache for statistics
 
 const cache: {
   paymentTypes: { timestamp: number; data: PaymentTypeStatistics[] | null };
@@ -66,6 +66,15 @@ const cache: {
 };
 
 export const StatisticsService = {
+  /**
+   * Xóa cache để force refresh dữ liệu
+   */
+  clearCache() {
+    cache.dashboard = { timestamp: 0, data: null };
+    cache.paymentTypes = { timestamp: 0, data: null };
+    cache.household.clear();
+  },
+
   /**
    * Lấy thống kê tổng quan cho dashboard
    */

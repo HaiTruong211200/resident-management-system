@@ -36,7 +36,8 @@ export const StatisticsPage: React.FC = () => {
     const fetchStatistics = async () => {
       try {
         setLoading(true);
-        const data = await StatisticsService.getDashboardStatistics();
+        // Always force refresh statistics when entering this page
+        const data = await StatisticsService.getDashboardStatistics({ force: true });
         if (!mounted) return;
         setStatistics(data);
         setError(null);
@@ -103,20 +104,18 @@ export const StatisticsPage: React.FC = () => {
   const ageChartData = useMemo<AgeChartData[]>(() => {
     if (!statistics?.ageDistribution) return [];
     return [
-      { name: "Mầm non (0-5)", count: 0 },
+      { name: "Mầm non (0-5)", count: statistics.ageDistribution["0-5"] || 0 },
       {
         name: "Học sinh (6-18)",
-        count: statistics.ageDistribution["0-17"] || 0,
+        count: statistics.ageDistribution["6-18"] || 0,
       },
       {
         name: "Thanh niên (19-35)",
-        count: statistics.ageDistribution["18-30"] || 0,
+        count: statistics.ageDistribution["19-35"] || 0,
       },
       {
         name: "Trung niên (36-60)",
-        count:
-          (statistics.ageDistribution["31-45"] || 0) +
-          (statistics.ageDistribution["46-60"] || 0),
+        count: statistics.ageDistribution["36-60"] || 0,
       },
       { name: "Cao tuổi (>60)", count: statistics.ageDistribution["60+"] || 0 },
     ];
