@@ -2,6 +2,7 @@ import api from "../lib/api";
 import { User } from "../types";
 
 const TOKEN_KEY = "auth_token";
+const SERVER_URL = "http://localhost:4000/api";
 
 export interface AuthPayload {
   account: User;
@@ -30,7 +31,10 @@ if (existing) setAuthToken(existing);
 
 export const AuthService = {
   async login(email: string, password: string): Promise<User> {
-    const resp = await api.post("/auth/login", { email, password });
+    const resp = await api.post(`${SERVER_URL}/auth/login`, {
+      email,
+      password,
+    });
     const payload: AuthPayload = resp.data.data || resp.data;
     const token = payload.accessToken || payload.token || null;
     if (token) setAuthToken(token);
@@ -43,7 +47,7 @@ export const AuthService = {
     password: string
   ): Promise<User> {
     console.log(username, email, password);
-    const resp = await api.post("/auth/register", {
+    const resp = await api.post(`${SERVER_URL}/auth/register`, {
       username,
       email,
       password,
@@ -56,7 +60,7 @@ export const AuthService = {
 
   async me(): Promise<User | null> {
     try {
-      const resp = await api.get("/me");
+      const resp = await api.get(`${SERVER_URL}/me`);
       const payload = resp.data.data || resp.data;
       return payload.account || null;
     } catch (err: any) {

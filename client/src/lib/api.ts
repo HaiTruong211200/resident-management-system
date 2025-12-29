@@ -13,7 +13,7 @@ const API_BASE_URL = VITE_SERVER_URL
   : "/api";
 
 const api = axios.create({
-  baseURL: VITE_SERVER_URL + "/api",
+  baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",

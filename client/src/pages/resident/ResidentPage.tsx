@@ -65,6 +65,7 @@ interface ResidentPageProps {
 export const ResidentPage: React.FC<ResidentPageProps> = ({
   filterHouseholdId,
   onBack,
+  onSelectHousehold,
 }) => {
   const { households, addResident, editResident, deleteResident } =
     useAppContext();
@@ -88,10 +89,15 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
   // State for View Details Modal
   const [viewingItem, setViewingItem] = useState<Resident | null>(null);
 
+  // Local household filter (select next to search)
+  const [localHouseholdFilter, setLocalHouseholdFilter] = useState<string>("");
+
   // route param (when navigated from Household page)
   const paramsRoute = useParams<{ householdId?: string }>();
   const routeHouseholdId = paramsRoute.householdId;
-  const effectiveHouseholdId = filterHouseholdId ?? routeHouseholdId ?? null;
+  const isFixedFilter = !!(filterHouseholdId ?? routeHouseholdId);
+  const effectiveHouseholdId =
+    filterHouseholdId ?? routeHouseholdId ?? (localHouseholdFilter || null);
 
   // Apply client-side sorting then filtering/searching
   const sortedResidents = [...residentsData].sort((a, b) => {
@@ -179,7 +185,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
       setFormData(item);
     } else {
       setEditingItem(null);
-        setFormData({
+      setFormData({
         // id: `R${Date.now()}`, // Internal ID
         householdId: effectiveHouseholdId || households[0]?.id || "",
         ethnicity: "Kinh",
@@ -267,18 +273,43 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-300 overflow-hidden">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-          <div className="relative max-w-md">
-            <Search
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"
-              size={18}
-            />
-            <input
-              type="text"
-              placeholder="Tìm theo tên, CCCD..."
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder="Tìm theo tên, CCCD..."
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <select
+              className="p-2 border border-slate-200 rounded-lg bg-white"
+              value={
+                isFixedFilter
+                  ? effectiveHouseholdId ?? ""
+                  : localHouseholdFilter
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                setLocalHouseholdFilter(v);
+                setPage(1);
+                if (onSelectHousehold) onSelectHousehold(v);
+              }}
+              disabled={isFixedFilter}
+            >
+              <option value="">Tất cả hộ</option>
+              {households.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.id} - {h.ownerName || "(Chưa có chủ hộ)"}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAppContext } from "../../context/AppContext";
+import { useAuth } from "../../context/AuthContext"; // QUAN TRỌNG: Dùng useAuth thay vì AppContext
 import { User, Lock, Mail, CheckCircle2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { AuthService } from "../../services/authService";
 
 export const LoginPage: React.FC = () => {
-  const { login } = useAppContext();
+  // Lấy login và register từ AuthContext
+  // Lúc này AppContext chưa tồn tại nên không được gọi useAppContext()
+  const { login, register } = useAuth();
   const navigate = useNavigate();
 
   const [isSignUpActive, setIsSignUpActive] = useState(false);
@@ -37,22 +38,25 @@ export const LoginPage: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginData.email || !loginData.password) {
-      // showToast("Vui lòng nhập email và mật khẩu", "error");
+      toast.error("Vui lòng nhập email và mật khẩu");
       return;
     }
 
     setIsLoading(true);
     try {
       await login(loginData.email, loginData.password);
+      // Sau khi login thành công, state isAuthenticated = true
+      // App.tsx sẽ tự động chuyển hướng và load AppProvider
       navigate("/");
     } catch (err: any) {
-      toast.error(err.message || "Đăng nhập thất bại");
+      // Lỗi đã được toast trong context, nhưng có thể handle thêm UI tại đây nếu cần
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (
       !registerData.username ||
@@ -68,25 +72,23 @@ export const LoginPage: React.FC = () => {
     }
 
     setIsSignUpLoading(true);
-    (async () => {
-      try {
-        console.log("Registering:", registerData);
-        await AuthService.register(
-          registerData.username,
-          registerData.email,
-          registerData.password
-        );
-        // Auto-login after registration
-        await login(registerData.email, registerData.password);
-        toast.success("Đăng ký thành công. Bạn đã được đăng nhập.");
-        setIsSignUpActive(false);
-        navigate("/");
-      } catch (err: any) {
-        toast.error(err.message || "Đăng ký thất bại");
-      } finally {
-        setIsSignUpLoading(false);
-      }
-    })();
+    try {
+      // Gọi hàm register từ Context
+      await register(
+        registerData.username,
+        registerData.email,
+        registerData.password
+      );
+
+      // Không cần gọi login thủ công, Context đã update user
+      setIsSignUpActive(false);
+      navigate("/");
+    } catch (err: any) {
+      // Lỗi xử lý trong context
+      console.error(err);
+    } finally {
+      setIsSignUpLoading(false);
+    }
   };
 
   return (
@@ -349,8 +351,12 @@ export const LoginPage: React.FC = () => {
             />
             <button
               type="submit"
-              className="btn-primary mt-4 shadow-lg shadow-blue-500/30"
+              disabled={isSignUpLoading}
+              className="btn-primary mt-4 shadow-lg shadow-blue-500/30 flex items-center gap-2"
             >
+              {isSignUpLoading && (
+                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              )}
               Đăng ký ngay
             </button>
           </form>
@@ -473,3 +479,4 @@ export const LoginPage: React.FC = () => {
     </div>
   );
 };
+export default LoginPage;

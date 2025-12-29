@@ -11,30 +11,10 @@ import { ResidentService } from "../services/residentService";
 import { HouseholdService } from "../services/householdService";
 import { PaymentTypeService } from "../services/paymentTypeService";
 import { HouseholdPaymentService } from "../services/householdPaymentService";
-import { AuthService } from "../services/authService";
 
-import {
-  Household,
-  Resident,
-  PaymentType,
-  HouseholdPayment,
-  User,
-} from "../types";
-
-const SERVER_URL = "http://localhost:4000";
+import { Household, Resident, PaymentType, HouseholdPayment } from "../types";
 
 interface AppContextType {
-  // Auth State
-  user: User | null;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (
-    username: string,
-    email: string,
-    password: string
-  ) => Promise<void>;
-  logout: () => void;
-
   // Data State
   households: Household[];
   residents: Resident[];
@@ -44,23 +24,20 @@ interface AppContextType {
   currentView: string | null;
 
   // Actions
-  addHousehold: (h: Household) => void;
-  editHousehold: (h: Household) => void;
-  deleteHousehold: (id: string) => void;
-
-  addResident: (r: Resident) => void;
-  editResident: (r: Resident) => void;
-  deleteResident: (id: number) => void;
-
-  addPaymentType: (p: PaymentType) => void;
-  editPaymentType: (p: PaymentType) => void;
-  deletePaymentType: (id: string) => void;
-
-  addPayment: (p: HouseholdPayment) => void;
-  editPayment: (p: HouseholdPayment) => void;
-
+  addHousehold: (h: Household) => Promise<void>;
+  editHousehold: (h: Household) => Promise<void>;
+  deleteHousehold: (id: string) => Promise<void>;
+  addResident: (r: Resident) => Promise<any>;
+  editResident: (r: Resident) => Promise<void>;
+  deleteResident: (id: number) => Promise<void>;
+  addPaymentType: (p: PaymentType) => Promise<void>;
+  editPaymentType: (p: PaymentType) => Promise<void>;
+  deletePaymentType: (id: string) => Promise<void>;
+  addPayment: (p: HouseholdPayment) => Promise<void>;
+  editPayment: (p: HouseholdPayment) => Promise<void>;
   setHouseholdSelectedId: (h: string | null) => void;
   setCurrentView: (v: string | null) => void;
+  refreshData: () => void; // Thêm hàm để chủ động load lại dữ liệu
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -68,295 +45,152 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  // Auth
-  const [user, setUser] = useState<User | null>(null);
-
-  // Data
   const [households, setHouseholds] = useState<Household[]>([]);
   const [residents, setResidents] = useState<Resident[]>([]);
   const [paymentTypes, setPaymentTypes] = useState<PaymentType[]>([]);
   const [payments, setPayments] = useState<HouseholdPayment[]>([]);
-
   const [householdSelectedId, setHouseholdSelectedId] = useState<string | null>(
     null
   );
-
   const [currentView, setCurrentView] = useState<string | null>(null);
 
-  const login = async (email: string, password: string) => {
+  // Hàm load dữ liệu tổng thể
+  const fetchData = async () => {
     try {
-      const account = await AuthService.login(email, password);
-      setUser(account);
+      const [resH, resR, resPT, resP] = await Promise.all([
+        HouseholdService.getHouseholds(),
+        ResidentService.getResidents({ page: 1, limit: 100 }),
+        PaymentTypeService.getPaymentTypes(),
+        HouseholdPaymentService.getHouseholdPayments(),
+      ]);
+
+      console.log("🔍 Debug Response Structure:");
+      console.log("Households Raw:", resH.data);
+      console.log("Residents Raw:", resR.data);
+      console.log("PaymentTypes Raw:", resPT.data);
+      console.log("Payments Raw:", resP.data);
+
+      setHouseholds(resH.data.data.households);
+      setResidents(resR.data.data.residents);
+      setPaymentTypes(resPT.data.data.paymentTypes);
+      setPayments(resP.data.data.payments);
     } catch (err: any) {
-      toast.error(err.message || "Đăng nhập thất bại");
-      throw err;
+      toast.error("Không thể tải dữ liệu: " + err.message);
     }
   };
 
-  const logout = () => {
-    AuthService.logout();
-    setUser(null);
-  };
-
-  const register = async (
-    username: string,
-    email: string,
-    password: string
-  ) => {
-    try {
-      const account = await AuthService.register(username, email, password);
-      setUser(account);
-    } catch (err: any) {
-      toast.error(err.message || "Đăng ký thất bại");
-      throw err;
-    }
-  };
-
-  // Restore session if token exists
+  // Chỉ chạy khi AppProvider được mount (lúc này chắc chắn đã đăng nhập)
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const account = await AuthService.me();
-        if (mounted && account) setUser(account);
-      } catch (err) {
-        // ignore
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
+    fetchData();
   }, []);
 
-  // Actions
+  // --- Actions Logic (Giữ nguyên các hàm xử lý API của bạn nhưng bọc trong async/await sạch sẽ hơn) ---
+
   const addHousehold = async (h: Household) => {
-    try {
-      const resp = await HouseholdService.addHousehold(h);
-      setHouseholds((prev) => [...prev, resp.data.data.household]);
-      toast.success("Thêm hộ khẩu thành công");
-    } catch (err: any) {
-      toast.error(err.message);
-      throw err;
-    }
+    const resp = await HouseholdService.addHousehold(h);
+    setHouseholds((prev) => [...prev, resp.data.data.household]);
+    toast.success("Thêm hộ khẩu thành công");
   };
 
   const editHousehold = async (h: Household) => {
-    try {
-      const resp = await HouseholdService.updateHousehold(h);
-      setHouseholds((prev) =>
-        prev.map((item) => (item.id === h.id ? resp.data.data.household : item))
-      );
-      toast.success("Cập nhật hộ khẩu thành công");
-    } catch (err: any) {
-      toast.error(err.message);
-      throw err;
-    }
+    const resp = await HouseholdService.updateHousehold(h);
+    setHouseholds((prev) =>
+      prev.map((item) => (item.id === h.id ? resp.data.data.household : item))
+    );
+    toast.success("Cập nhật hộ khẩu thành công");
   };
 
   const deleteHousehold = async (id: string) => {
-    try {
-      await HouseholdService.deleteHousehold(id);
-
-      setHouseholds((prev) => prev.filter((h) => h.id !== id));
-      setResidents((prev) => prev.filter((r) => r.householdId !== id));
-
-      toast.success("Đã xóa hộ khẩu");
-    } catch (err: any) {
-      toast.error(err.message);
-      throw err;
-    }
+    await HouseholdService.deleteHousehold(id);
+    setHouseholds((prev) => prev.filter((h) => h.id !== id));
+    toast.success("Đã xóa hộ khẩu");
   };
 
-  // const addResident = (r: Resident) => setResidents([...residents, r]);
   const addResident = async (data: Resident) => {
-    try {
-      console.log("hello");
-      console.log(typeof data.dateOfBirth);
-      const resp = await ResidentService.addResident(data);
-      console.log("Add Resident response:", resp);
-      setResidents((prev) => [resp.data.data.resident, ...prev]);
-      toast.success("Thêm cư dân thành công");
-      return resp.data.data.resident;
-    } catch (err: any) {
-      toast.error(err.message);
-      throw err;
-    }
+    const resp = await ResidentService.addResident(data);
+    setResidents((prev) => [resp.data.data.resident, ...prev]);
+    toast.success("Thêm cư dân thành công");
+    return resp.data.data.resident;
   };
 
-  // const editResident = (r: Resident) =>
-  //   setResidents(residents.map((item) => (item.id === r.id ? r : item)));
-  // const deleteResident = (id: string) =>
-  //   setResidents(residents.filter((r) => r.id !== id));
   const editResident = async (data: Resident) => {
-    console.log("Updating resident:", data);
-    console.log(residents);
-    try {
-      const resp = await ResidentService.updateResident(data);
-      console.log("Edit Resident response:", resp);
-      setResidents((prev) =>
-        prev.map((r) => (r.id === data.id ? resp.data.data.resident : r))
-      );
-      toast.success("Cập nhật cư dân thành công");
-    } catch (err: any) {
-      toast.error(err.message);
-      throw err;
-    }
+    const resp = await ResidentService.updateResident(data);
+    setResidents((prev) =>
+      prev.map((r) => (r.id === data.id ? resp.data.data.resident : r))
+    );
+    toast.success("Cập nhật cư dân thành công");
   };
 
   const deleteResident = async (id: number) => {
-    try {
-      await ResidentService.deleteResident(id);
-      setResidents((prev) => prev.filter((r) => r.id !== id));
-      toast.success("Đã xóa cư dân");
-    } catch (err: any) {
-      toast.error(err.message);
-      throw err;
-    }
+    await ResidentService.deleteResident(id);
+    setResidents((prev) => prev.filter((r) => r.id !== id));
+    toast.success("Đã xóa cư dân");
   };
 
   const addPaymentType = async (p: PaymentType) => {
-    try {
-      const resp = await PaymentTypeService.addPaymentType(p);
-      setPaymentTypes([...paymentTypes, resp.data.data.paymentType]);
-      toast.success("Thêm khoản thu thành công");
-    } catch (err: any) {
-      toast.error(err.message);
-      throw err;
-    }
+    const resp = await PaymentTypeService.addPaymentType(p);
+    setPaymentTypes((prev) => [...prev, resp.data.data.paymentType]);
+    toast.success("Thêm khoản thu thành công");
   };
 
   const editPaymentType = async (p: PaymentType) => {
-    try {
-      const resp = await PaymentTypeService.updatePaymentType(p);
-      setPaymentTypes((prev) =>
-        prev.map((item) =>
-          item.id === p.id ? resp.data.data.paymentType : item
-        )
-      );
-      toast.success("Cập nhật khoản thu thành công");
-    } catch (err: any) {
-      toast.error(err.message);
-      throw err;
-    }
+    const resp = await PaymentTypeService.updatePaymentType(p);
+    setPaymentTypes((prev) =>
+      prev.map((item) => (item.id === p.id ? resp.data.data.paymentType : item))
+    );
+    toast.success("Cập nhật khoản thu thành công");
   };
 
   const deletePaymentType = async (id: string) => {
-    try {
-      await PaymentTypeService.deletePaymentType(id);
-      setPaymentTypes((prev) => prev.filter((p) => p.id !== id));
-      toast.success("Đã xóa khoản thu");
-    } catch (err: any) {
-      toast.error(err.message);
-      throw err;
-    }
+    await PaymentTypeService.deletePaymentType(id);
+    setPaymentTypes((prev) => prev.filter((p) => p.id !== id));
+    toast.success("Đã xóa khoản thu");
   };
 
-  // const deleteHousehold = async (id: string) => {
-  //   try {
-  //     await HouseholdService.deleteHousehold(id);
+  const addPayment = async (data: HouseholdPayment) => {
+    const resp = await HouseholdPaymentService.addHouseholdPayment(data);
+    setPayments((prev) => [...prev, resp.data.data.payment]);
+    toast.success("Thêm thanh toán thành công");
+  };
 
-  //     setHouseholds((prev) => prev.filter((h) => h.id !== id));
-  //     setResidents((prev) => prev.filter((r) => r.householdId !== id));
+  const editPayment = async (data: HouseholdPayment) => {
+    const resp = await HouseholdPaymentService.updateHouseholdPayment(data);
+    setPayments((prev) =>
+      prev.map((p) => (p.id === data.id ? resp.data.data.payment : p))
+    );
+    toast.success("Cập nhật thanh toán thành công");
+  };
 
-  //     toast.success("Đã xóa hộ khẩu");
-  //   } catch (err: any) {
-  //     toast.error(err.message);
-  //     throw err;
-  //   }
-  // };
-
+  // --- Computed States ---
   const householdsWithOwnerName = useMemo(() => {
     return households.map((h) => {
-      let ownerName = "";
-
-      // Cách 1: dùng householdHeadId (CHUẨN NHẤT)
-      if (h.householdHeadId) {
-        const head = residents.find((r) => r.id === h.householdHeadId);
-        ownerName = head?.fullName || "";
-      }
-
-      // Cách 2 (fallback): relationshipToHead === "Chủ hộ"
-      if (!ownerName) {
-        const head = residents.find(
+      const head =
+        residents.find((r) => r.id === h.householdHeadId) ||
+        residents.find(
           (r) => r.householdId === h.id && r.relationshipToHead === "Chủ hộ"
         );
-        ownerName = head?.fullName || "";
-      }
-
-      return {
-        ...h,
-        ownerName,
-      };
+      return { ...h, ownerName: head?.fullName || "Chưa rõ" };
     });
   }, [households, residents]);
 
   const paymentTypesWithCanEdit = useMemo(() => {
-    console.log(paymentTypes);
     return paymentTypes.map((p) => ({
       ...p,
       canEdit: new Date(p.startDate).getTime() > Date.now(),
     }));
   }, [paymentTypes]);
 
-  useEffect(() => {
-    HouseholdService.getHouseholds()
-      .then((resp) => setHouseholds(resp.data.data.households))
-      .catch((err) => toast.error(err.message));
-
-    ResidentService.getResidents({ page: 1, limit: 100 })
-      .then((resp) => setResidents(resp.data.data.residents))
-      .catch((err) => toast.error(err.message));
-
-    PaymentTypeService.getPaymentTypes()
-      .then((resp) => setPaymentTypes(resp.data.data.paymentTypes))
-      .catch((err) => toast.error(err.message));
-
-    HouseholdPaymentService.getHouseholdPayments()
-      .then((resp) => setPayments(resp.data.data.payments))
-      .catch((err) => toast.error(err.message));
-  }, []);
-
-  // const addPaymentType = (p: PaymentType) =>
-  //   setPaymentTypes([...paymentTypes, p]);
-  // const addPayment = (p: HouseholdPayment) => setPayments([p, ...payments]);
-  const addPayment = async (data: HouseholdPayment) => {
-    try {
-      const resp = await HouseholdPaymentService.addHouseholdPayment(data);
-      setPayments([...payments, resp.data.data.payment]);
-      toast.success("Thêm khoản thu thành công");
-    } catch (err: any) {
-      toast.error(err.message);
-      throw err;
-    }
-  };
-
-  const editPayment = async (data: HouseholdPayment) => {
-    try {
-      const resp = await HouseholdPaymentService.updateHouseholdPayment(data);
-      console.log("Edit Payment response:", resp);
-      setPayments((prev) =>
-        prev.map((p) => (p.id === data.id ? resp.data.data.payment : p))
-      );
-      toast.success("Cập nhật khoản thu thành công");
-    } catch (err: any) {
-      toast.error(err.message);
-      throw err;
-    }
-  };
-
-  const isAuthenticated = !!user;
-
   return (
     <AppContext.Provider
       value={{
-        user,
-        isAuthenticated: !!user,
-        login,
-        logout,
         households: householdsWithOwnerName,
         residents,
         paymentTypes: paymentTypesWithCanEdit,
         payments,
+        householdSelectedId,
+        setHouseholdSelectedId,
+        currentView,
+        setCurrentView,
         addHousehold,
         editHousehold,
         deleteHousehold,
@@ -368,11 +202,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         deletePaymentType,
         addPayment,
         editPayment,
-        householdSelectedId,
-        setHouseholdSelectedId,
-        currentView,
-        setCurrentView,
-        register,
+        refreshData: fetchData,
       }}
     >
       {children}
@@ -382,8 +212,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
 export const useAppContext = () => {
   const context = useContext(AppContext);
-  if (context === undefined) {
+  if (context === undefined)
     throw new Error("useAppContext must be used within an AppProvider");
-  }
   return context;
 };

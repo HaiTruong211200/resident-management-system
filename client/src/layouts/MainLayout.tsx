@@ -1,14 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
 import { Sidebar } from "../components/Sidebar";
 import { useAppContext } from "../context/AppContext";
-import { Outlet, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext"; // Import thêm useAuth
 import { LogOut, Settings, UserIcon, ChevronDown } from "lucide-react";
-import { useState } from "react";
 
 export const MainLayout = () => {
-  const { logout, user, currentView, setCurrentView } = useAppContext();
+  // Tách biệt logic: Auth lấy từ useAuth, Data lấy từ useAppContext
+  const { user, logout } = useAuth();
+  const { currentView, setCurrentView } = useAppContext();
+
   const navigate = useNavigate();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
   const handleOnChangeView = (view: string) => {
     setCurrentView(view);
     navigate(`/${view}`);
@@ -54,7 +58,7 @@ export const MainLayout = () => {
                 </div>
                 <div className="text-right hidden sm:block">
                   <div className="text-sm font-bold text-slate-700 leading-tight">
-                    {user?.fullName || "Admin"}
+                    {user?.fullName || user?.username || "Admin"}
                   </div>
                   <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">
                     {user?.role || "Quản trị viên"}
@@ -84,7 +88,7 @@ export const MainLayout = () => {
                         {user?.username}
                       </p>
                       <p className="text-xs text-slate-500 truncate">
-                        {user?.id}
+                        ID: {user?.id}
                       </p>
                     </div>
 
