@@ -2,7 +2,7 @@ import api from "../lib/api";
 import { Resident } from "../types";
 
 export const ResidentService = {
-  getResidents(params: { page: number; limit: number; householdId?: number }) {
+  getResidents(params: { page: number; limit: number; householdId?: string }) {
     return api.get("/residents", { params });
   },
 

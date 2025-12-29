@@ -1,6 +1,7 @@
 const express = require('express');
 const {body, param} = require('express-validator');
 const router = express.Router();
+const {auth, adminOnly} = require('../middleware/auth');
 const {
   createPaymentType,
   listPaymentTypes,
@@ -8,8 +9,9 @@ const {
   updatePaymentType,
 } = require('../controllers/paymentTypeController');
 
+// Admin only routes
 router.post(
-    '/',
+    '/', auth, adminOnly,
     [
       body('name').isString().notEmpty(),
       body('paymentType').isIn(['Bắt buộc', 'Tự nguyện']),
@@ -20,14 +22,9 @@ router.post(
       body('description').optional().isString(),
     ],
     createPaymentType);
-// List all payment types
-router.get('/', listPaymentTypes);
-
-// Get payment type by id
-router.get('/:id', [param('id').isInt().toInt()], getPaymentTypeById);
 
 router.patch(
-    '/:id',
+    '/:id', auth, adminOnly,
     [
       body('name').optional().isString().notEmpty(),
       body('paymentType').optional().isIn(['Bắt buộc', 'Tự nguyện']),
@@ -41,5 +38,11 @@ router.patch(
       body('description').optional({nullable: true}).isString(),
     ],
     updatePaymentType);
+
+// List all payment types
+router.get('/', auth, listPaymentTypes);
+
+// Get payment type by id
+router.get('/:id', auth, [param('id').isInt().toInt()], getPaymentTypeById);
 
 module.exports = router;

@@ -1,15 +1,17 @@
 const express = require('express');
 const {body, param, query} = require('express-validator');
 const router = express.Router();
+const {auth, adminOnly} = require('../middleware/auth');
 
 const residentController = require('../controllers/residentController');
 
 // Get all residents
-router.get('/', residentController.getAllResidents);
+router.get('/', auth, residentController.getAllResidents);
+
 
 // Create resident
 router.post(
-    '/',
+    '/', auth, adminOnly,
     [
       body('householdId')
           .optional()
@@ -34,17 +36,12 @@ router.post(
 
 // Update resident
 router.put(
-    '/:id', [param('id').isInt().withMessage('Invalid id')],
+    '/:id', auth, adminOnly, [param('id').isInt().withMessage('Invalid id')],
     residentController.updateResident);
-
-// Search residents
-router.get(
-    '/search', [query('keyword').optional().isString()],
-    residentController.searchResidents);
 
 // Delete resident (soft delete)
 router.delete(
-    '/:id', [param('id').isInt().withMessage('Invalid id')],
+    '/:id', auth, adminOnly, [param('id').isInt().withMessage('Invalid id')],
     residentController.deleteResident);
 
 module.exports = router;

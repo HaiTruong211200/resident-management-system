@@ -1,4 +1,4 @@
-const { validationResult } = require("express-validator");
+const {validationResult} = require('express-validator');
 const {
   createResident,
   updateResident,
@@ -6,16 +6,16 @@ const {
   findById: findResidentById,
   getAllResidents,
   deleteResident,
-} = require("../models/Resident");
+} = require('../models/Resident');
 const {
   findById: findHouseholdById,
   updateNumberCount,
-} = require("../models/Household");
+} = require('../models/Household');
 const {
   sendSuccess,
   sendError,
   validationFailed,
-} = require("../utils/response");
+} = require('../utils/response');
 
 function getAgeDifference(date1, date2) {
   const diff = Math.abs(new Date(date1) - new Date(date2));
@@ -25,56 +25,56 @@ function getAgeDifference(date1, date2) {
 // Helper function to validate age based on relationship
 async function validateAgeForRelationship(residentData, householdHeadId) {
   if (!residentData.dateOfBirth || !residentData.relationshipToHead) {
-    return { valid: true };
+    return {valid: true};
   }
 
   const relationship = residentData.relationshipToHead.toLowerCase();
 
   // Only validate for specific relationships
-  if (!["Con", "Cha/Mẹ"].some((rel) => relationship.includes(rel))) {
-    return { valid: true };
+  if (!['Con', 'Cha/Mẹ'].some((rel) => relationship.includes(rel))) {
+    return {valid: true};
   }
 
   const head = await findResidentById(householdHeadId);
   if (!head || !head.dateOfBirth) {
-    return { valid: true }; // Skip validation if head DOB not available
+    return {valid: true};  // Skip validation if head DOB not available
   }
 
   const ageDiff = getAgeDifference(residentData.dateOfBirth, head.dateOfBirth);
 
   // Child relationship - must be at least 18 years younger
-  if (relationship.includes("Con")) {
+  if (relationship.includes('Con')) {
     if (new Date(residentData.dateOfBirth) <= new Date(head.dateOfBirth)) {
       return {
         valid: false,
-        message: "Child must be younger than household head",
+        message: 'Child must be younger than household head',
       };
     }
     if (ageDiff < 18) {
       return {
         valid: false,
-        message: "Child must be at least 18 years younger than household head",
+        message: 'Child must be at least 18 years younger than household head',
       };
     }
   }
 
   // Parent relationship - must be at least 18 years older
-  if (["Cha/Mẹ"].some((rel) => relationship.includes(rel))) {
+  if (['Cha/Mẹ'].some((rel) => relationship.includes(rel))) {
     if (new Date(residentData.dateOfBirth) >= new Date(head.dateOfBirth)) {
       return {
         valid: false,
-        message: "Parent must be older than household head",
+        message: 'Parent must be older than household head',
       };
     }
     if (ageDiff < 18) {
       return {
         valid: false,
-        message: "Parent must be at least 18 years older than household head",
+        message: 'Parent must be at least 18 years older than household head',
       };
     }
   }
 
-  return { valid: true };
+  return {valid: true};
 }
 
 async function createResidentHandler(req, res) {
@@ -90,21 +90,19 @@ async function createResidentHandler(req, res) {
       if (!household)
         return sendError(res, {
           status: 404,
-          message: "Household not found",
-          code: "HOUSEHOLD_NOT_FOUND",
+          message: 'Household not found',
+          code: 'HOUSEHOLD_NOT_FOUND',
         });
 
       // Validate age if household has a head
       if (household.householdHeadId) {
         const ageValidation = await validateAgeForRelationship(
-          payload,
-          household.householdHeadId
-        );
+            payload, household.householdHeadId);
         if (!ageValidation.valid) {
           return sendError(res, {
             status: 400,
             message: ageValidation.message,
-            code: "INVALID_AGE_FOR_RELATIONSHIP",
+            code: 'INVALID_AGE_FOR_RELATIONSHIP',
           });
         }
       }
@@ -117,14 +115,14 @@ async function createResidentHandler(req, res) {
       await updateNumberCount(payload.householdId, true);
     }
 
-    return sendSuccess(res, { resident }, { status: 201 });
+    return sendSuccess(res, {resident}, {status: 201});
   } catch (err) {
-    if (err.code === "23505") {
+    if (err.code === '23505') {
       console.log(err);
       return sendError(res, {
         status: 409,
-        message: "Duplicate idCardNumber",
-        code: "DUPLICATE_ID_CARD",
+        message: 'Duplicate idCardNumber',
+        code: 'DUPLICATE_ID_CARD',
       });
     }
     console.error(err);
@@ -144,8 +142,8 @@ async function updateResidentHandler(req, res) {
     if (!currentResident)
       return sendError(res, {
         status: 404,
-        message: "Resident not found",
-        code: "RESIDENT_NOT_FOUND",
+        message: 'Resident not found',
+        code: 'RESIDENT_NOT_FOUND',
       });
 
     const oldHouseholdId = currentResident.householdId;
@@ -158,22 +156,20 @@ async function updateResidentHandler(req, res) {
         if (!household)
           return sendError(res, {
             status: 400,
-            message: "Invalid household id",
-            code: "INVALID_HOUSEHOLD",
+            message: 'Invalid household id',
+            code: 'INVALID_HOUSEHOLD',
           });
 
         // Validate age if household has a head
         if (household.householdHeadId) {
-          const residentData = { ...currentResident, ...payload };
+          const residentData = {...currentResident, ...payload};
           const ageValidation = await validateAgeForRelationship(
-            residentData,
-            household.householdHeadId
-          );
+              residentData, household.householdHeadId);
           if (!ageValidation.valid) {
             return sendError(res, {
               status: 400,
               message: ageValidation.message,
-              code: "INVALID_AGE_FOR_RELATIONSHIP",
+              code: 'INVALID_AGE_FOR_RELATIONSHIP',
             });
           }
         }
@@ -189,7 +185,7 @@ async function updateResidentHandler(req, res) {
     }
 
     const resident = await updateResident(id, payload);
-    return sendSuccess(res, { resident });
+    return sendSuccess(res, {resident});
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -204,8 +200,8 @@ async function deleteResidentHandler(req, res) {
     if (!resident)
       return sendError(res, {
         status: 404,
-        message: "Resident not found",
-        code: "RESIDENT_NOT_FOUND",
+        message: 'Resident not found',
+        code: 'RESIDENT_NOT_FOUND',
       });
 
     // Check if resident is household head
@@ -215,8 +211,8 @@ async function deleteResidentHandler(req, res) {
         return sendError(res, {
           status: 400,
           message:
-            "Cannot delete household head. Please change household head first.",
-          code: "CANNOT_DELETE_HOUSEHOLD_HEAD",
+              'Cannot delete household head. Please change household head first.',
+          code: 'CANNOT_DELETE_HOUSEHOLD_HEAD',
         });
       }
     }
@@ -228,7 +224,7 @@ async function deleteResidentHandler(req, res) {
       await updateNumberCount(resident.householdId, false);
     }
 
-    return sendSuccess(res, { resident: deleted });
+    return sendSuccess(res, {resident: deleted});
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -237,16 +233,16 @@ async function deleteResidentHandler(req, res) {
 
 async function searchResidentsHandler(req, res) {
   try {
-    const keyword = (req.query.keyword || "").trim();
+    const keyword = (req.query.keyword || '').trim();
     if (!keyword)
       return sendError(res, {
         status: 400,
-        message: "keyword query is required",
-        code: "MISSING_KEYWORD",
+        message: 'keyword query is required',
+        code: 'MISSING_KEYWORD',
       });
 
     const results = await searchResidents(keyword);
-    return sendSuccess(res, { results });
+    return sendSuccess(res, {results});
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -257,15 +253,17 @@ async function getAllResidentsHandler(req, res) {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.max(1, Number(req.query.limit) || 20);
-    const householdId = req.query.householdId
-      ? Number(req.query.householdId)
-      : undefined;
+    const householdId =
+        req.query.householdId ? String(req.query.householdId) : undefined;
 
     // Parse optional sorting params
     const sortBy = req.query.sortBy ? String(req.query.sortBy) : undefined;
     const order = req.query.order ? String(req.query.order) : undefined;
 
-    const { data, count } = await getAllResidents({
+    console.log(`[GET /api/residents] Fetching residents - page: ${
+        page}, limit: ${limit}, householdId: ${householdId || 'ALL'}`);
+
+    const {data, count} = await getAllResidents({
       page,
       limit,
       householdId,
@@ -273,20 +271,23 @@ async function getAllResidentsHandler(req, res) {
       order,
     });
 
+    console.log(`[GET /api/residents] Found ${
+        count} total residents, returning ${data.length} for current page`);
+
     return sendSuccess(res, {
       residents: data,
-      meta: { total: count, page, limit },
+      meta: {total: count, page, limit},
     });
   } catch (err) {
-    console.error(err);
+    console.error('[GET /api/residents] Error:', err);
     return sendError(res);
   }
 }
 
 module.exports = {
-  createResident: createResidentHandler,
-  updateResident: updateResidentHandler,
-  searchResidents: searchResidentsHandler,
-  getAllResidents: getAllResidentsHandler,
-  deleteResident: deleteResidentHandler,
+  createResident : createResidentHandler,
+  updateResident : updateResidentHandler,
+  searchResidents : searchResidentsHandler,
+  getAllResidents : getAllResidentsHandler,
+  deleteResident : deleteResidentHandler,
 };

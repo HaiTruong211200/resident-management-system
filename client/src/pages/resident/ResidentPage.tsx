@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { Resident, Gender } from "../../types";
+import { ResidentService } from "../../services/residentService";
 import {
   Plus,
   Search,
@@ -149,22 +150,21 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
   const fetchResidents = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.set("page", String(page));
-      params.set("limit", String(limit));
-      if (effectiveHouseholdId) params.set("householdId", effectiveHouseholdId);
+      const params: any = {
+        page,
+        limit,
+      };
+      if (effectiveHouseholdId) {
+        params.householdId = effectiveHouseholdId;
+      }
 
-      const resp = await fetch(
-        `${SERVER_URL}/api/residents?${params.toString()}`
-      );
-      if (!resp.ok) throw new Error("Failed to fetch residents");
-      const json = await resp.json();
-      const data = json?.data?.residents || [];
-      const meta = json?.data?.meta || {};
+      const response = await ResidentService.getResidents(params);
+      const data = response.data?.data?.residents || [];
+      const meta = response.data?.data?.meta || {};
       setResidentsData(data);
       setTotal(meta.total || 0);
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching residents:", err);
     } finally {
       setLoading(false);
     }
