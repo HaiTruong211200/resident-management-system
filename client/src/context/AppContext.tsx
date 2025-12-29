@@ -11,6 +11,7 @@ import { ResidentService } from "../services/residentService";
 import { HouseholdService } from "../services/householdService";
 import { PaymentTypeService } from "../services/paymentTypeService";
 import { HouseholdPaymentService } from "../services/householdPaymentService";
+import { AuthService } from "../services/authService";
 
 import {
   Household,
@@ -19,7 +20,6 @@ import {
   HouseholdPayment,
   User,
 } from "../types";
-import { MOCK_USER } from "../services/mockData";
 
 const SERVER_URL = "http://localhost:4000";
 
@@ -27,7 +27,12 @@ interface AppContextType {
   // Auth State
   user: User | null;
   isAuthenticated: boolean;
-  login: (username: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (
+    username: string,
+    email: string,
+    password: string
+  ) => Promise<void>;
   logout: () => void;
 
   // Data State
@@ -78,19 +83,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
   const [currentView, setCurrentView] = useState<string | null>(null);
 
-  const login = async (username: string) => {
-    // Simulate API call
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        setUser({ ...MOCK_USER, username });
-        resolve();
-      }, 800);
-    });
+  const login = async (email: string, password: string) => {
+    try {
+      const account = await AuthService.login(email, password);
+      setUser(account);
+    } catch (err: any) {
+      toast.error(err.message || "Đăng nhập thất bại");
+      throw err;
+    }
   };
 
   const logout = () => {
+    AuthService.logout();
     setUser(null);
   };
+
+  const register = async (
+    username: string,
+    email: string,
+    password: string
+  ) => {
+    try {
+      const account = await AuthService.register(username, email, password);
+      setUser(account);
+    } catch (err: any) {
+      toast.error(err.message || "Đăng ký thất bại");
+      throw err;
+    }
+  };
+
+  // Restore session if token exists
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const account = await AuthService.me();
+        if (mounted && account) setUser(account);
+      } catch (err) {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Actions
   const addHousehold = async (h: Household) => {
@@ -308,6 +344,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
+  const isAuthenticated = !!user;
+
   return (
     <AppContext.Provider
       value={{
@@ -334,6 +372,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         setHouseholdSelectedId,
         currentView,
         setCurrentView,
+        register,
       }}
     >
       {children}

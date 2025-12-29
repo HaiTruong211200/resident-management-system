@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Home, Users, DollarSign, TrendingUp, Loader } from "lucide-react";
 import {
   BarChart,
@@ -12,102 +12,47 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { StatisticsService, DashboardStatistics, AgeDistribution, MonthlyCollection } from "../services/statisticsService";
+import {
+  StatisticsService,
+  DashboardStatistics,
+  AgeDistribution,
+  MonthlyCollection,
+} from "../services/statisticsService";
 
 interface AgeChartData {
   name: string;
   count: number;
 }
 
-// Mock data khi API không khả dụng
-const MOCK_STATISTICS: DashboardStatistics = {
-  totalHouseholds: 3,
-  totalResidents: 4,
-  totalFees: 716000,
-  totalFunds: 0,
-  totalCollection: 716000,
-  ageDistribution: {
-    "0-17": 1,
-    "18-30": 0,
-    "31-45": 1,
-    "46-60": 2,
-    "60+": 0,
-  },
-  monthlyCollection: [
-    { month: "T1", fees: 4000, funds: 2000, total: 6000 },
-    { month: "T2", fees: 3000, funds: 1500, total: 4500 },
-    { month: "T3", fees: 2000, funds: 1000, total: 3000 },
-    { month: "T4", fees: 2780, funds: 1390, total: 4170 },
-    { month: "T5", fees: 1890, funds: 945, total: 2835 },
-    { month: "T6", fees: 2390, funds: 1195, total: 3585 },
-    { month: "T7", fees: 3490, funds: 1745, total: 5235 },
-    { month: "T8", fees: 4000, funds: 2000, total: 6000 },
-    { month: "T9", fees: 3000, funds: 1500, total: 4500 },
-    { month: "T10", fees: 2000, funds: 1000, total: 3000 },
-    { month: "T11", fees: 2780, funds: 1390, total: 4170 },
-    { month: "T12", fees: 1890, funds: 945, total: 2835 },
-  ],
-  recentTransactions: [],
-};
-
 export const StatisticsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [statistics, setStatistics] = useState<DashboardStatistics | null>(null);
-  const [ageChartData, setAgeChartData] = useState<AgeChartData[]>([]);
-  const [feeData, setFeeData] = useState<MonthlyCollection[]>([]);
+  const [statistics, setStatistics] = useState<DashboardStatistics | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
-  const [useMockData, setUseMockData] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     const fetchStatistics = async () => {
       try {
         setLoading(true);
         const data = await StatisticsService.getDashboardStatistics();
+        if (!mounted) return;
         setStatistics(data);
-
-        // Transform age distribution data for bar chart
-        if (data.ageDistribution) {
-          const ageChartTransformed: AgeChartData[] = [
-            { name: "Mầm non (0-5)", count: 0 },
-            { name: "Học sinh (6-18)", count: data.ageDistribution["0-17"] || 0 },
-            { name: "Thanh niên (19-35)", count: data.ageDistribution["18-30"] || 0 },
-            { name: "Trung niên (36-60)", count: (data.ageDistribution["31-45"] || 0) + (data.ageDistribution["46-60"] || 0) },
-            { name: "Cao tuổi (>60)", count: data.ageDistribution["60+"] || 0 },
-          ];
-          setAgeChartData(ageChartTransformed);
-        }
-
-        // Set fee data
-        if (data.monthlyCollection) {
-          setFeeData(data.monthlyCollection);
-        }
-
         setError(null);
-        setUseMockData(false);
       } catch (err) {
         console.error("Error fetching statistics:", err);
-        // Fallback to mock data
-        setStatistics(MOCK_STATISTICS);
-        setUseMockData(true);
-
-        // Transform mock age distribution data
-        const ageChartTransformed: AgeChartData[] = [
-          { name: "Mầm non (0-5)", count: 0 },
-          { name: "Học sinh (6-18)", count: MOCK_STATISTICS.ageDistribution["0-17"] || 0 },
-          { name: "Thanh niên (19-35)", count: MOCK_STATISTICS.ageDistribution["18-30"] || 0 },
-          { name: "Trung niên (36-60)", count: (MOCK_STATISTICS.ageDistribution["31-45"] || 0) + (MOCK_STATISTICS.ageDistribution["46-60"] || 0) },
-          { name: "Cao tuổi (>60)", count: MOCK_STATISTICS.ageDistribution["60+"] || 0 },
-        ];
-        setAgeChartData(ageChartTransformed);
-        setFeeData(MOCK_STATISTICS.monthlyCollection);
-
-        setError(null);
+        if (!mounted) return;
+        setError("Không thể tải dữ liệu thống kê. Vui lòng thử lại sau.");
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
     fetchStatistics();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const formatCurrency = (value: number): string => {
@@ -117,50 +62,99 @@ export const StatisticsPage: React.FC = () => {
     }).format(value);
   };
 
-  const stats = [
-    {
-      icon: Home,
-      label: "Tổng hộ khẩu",
-      value: statistics?.totalHouseholds || 0,
-      bgColor: "bg-blue-50",
-      iconColor: "text-blue-600",
-      borderColor: "border-blue-200",
-    },
-    {
-      icon: Users,
-      label: "Tổng nhân khẩu",
-      value: statistics?.totalResidents || 0,
-      bgColor: "bg-purple-50",
-      iconColor: "text-purple-600",
-      borderColor: "border-purple-200",
-    },
-    {
-      icon: DollarSign,
-      label: "Tổng thu phí",
-      value: formatCurrency(statistics?.totalFees || 0),
-      bgColor: "bg-green-50",
-      iconColor: "text-green-600",
-      borderColor: "border-green-200",
-    },
-    {
-      icon: TrendingUp,
-      label: "Tổng thu quỹ",
-      value: formatCurrency(statistics?.totalFunds || 0),
-      bgColor: "bg-orange-50",
-      iconColor: "text-orange-600",
-      borderColor: "border-orange-200",
-    },
-  ];
+  const stats = useMemo(
+    () => [
+      {
+        icon: Home,
+        label: "Tổng hộ khẩu",
+        value: statistics?.totalHouseholds || 0,
+        bgColor: "bg-blue-50",
+        iconColor: "text-blue-600",
+        borderColor: "border-blue-200",
+      },
+      {
+        icon: Users,
+        label: "Tổng nhân khẩu",
+        value: statistics?.totalResidents || 0,
+        bgColor: "bg-purple-50",
+        iconColor: "text-purple-600",
+        borderColor: "border-purple-200",
+      },
+      {
+        icon: DollarSign,
+        label: "Tổng thu phí",
+        value: formatCurrency(statistics?.totalFees || 0),
+        bgColor: "bg-green-50",
+        iconColor: "text-green-600",
+        borderColor: "border-green-200",
+      },
+      {
+        icon: TrendingUp,
+        label: "Tổng thu quỹ",
+        value: formatCurrency(statistics?.totalFunds || 0),
+        bgColor: "bg-orange-50",
+        iconColor: "text-orange-600",
+        borderColor: "border-orange-200",
+      },
+    ],
+    [statistics]
+  );
+
+  const ageChartData = useMemo<AgeChartData[]>(() => {
+    if (!statistics?.ageDistribution) return [];
+    return [
+      { name: "Mầm non (0-5)", count: 0 },
+      {
+        name: "Học sinh (6-18)",
+        count: statistics.ageDistribution["0-17"] || 0,
+      },
+      {
+        name: "Thanh niên (19-35)",
+        count: statistics.ageDistribution["18-30"] || 0,
+      },
+      {
+        name: "Trung niên (36-60)",
+        count:
+          (statistics.ageDistribution["31-45"] || 0) +
+          (statistics.ageDistribution["46-60"] || 0),
+      },
+      { name: "Cao tuổi (>60)", count: statistics.ageDistribution["60+"] || 0 },
+    ];
+  }, [statistics]);
+
+  const feeData = useMemo<MonthlyCollection[]>(
+    () => statistics?.monthlyCollection || [],
+    [statistics]
+  );
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-800">Tổng quan</h1>
-        <p className="text-slate-500 mt-1">Xem tổng quan các thông tin quan trọng</p>
-        {useMockData && (
-          <p className="text-amber-600 text-sm mt-2">
-            ℹ️ Hiển thị dữ liệu mẫu (cần setup database để hiển thị dữ liệu thực)
-          </p>
+        <p className="text-slate-500 mt-1">
+          Xem tổng quan các thông tin quan trọng
+        </p>
+        {error && (
+          <div className="mt-2 flex items-center gap-3">
+            <p className="text-rose-600 text-sm">⚠️ {error}</p>
+            <button
+              className="text-sm underline text-slate-600"
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                StatisticsService.getDashboardStatistics({ force: true })
+                  .then((data) => setStatistics(data))
+                  .catch((e) =>
+                    setError(
+                      "Không thể tải dữ liệu thống kê. Vui lòng thử lại sau."
+                    )
+                  )
+                  .finally(() => setLoading(false));
+              }}
+            >
+              Thử lại
+            </button>
+          </div>
         )}
       </div>
 
@@ -211,7 +205,10 @@ export const StatisticsPage: React.FC = () => {
                 Thống kê độ tuổi cư dân
               </h2>
               <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={ageChartData} margin={{ bottom: 60, left: 0, right: 0, top: 0 }}>
+                <BarChart
+                  data={ageChartData}
+                  margin={{ bottom: 60, left: 0, right: 0, top: 0 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     dataKey="name"
@@ -237,7 +234,9 @@ export const StatisticsPage: React.FC = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                  <Tooltip
+                    formatter={(value) => formatCurrency(value as number)}
+                  />
                   <Legend />
                   <Line
                     type="monotone"

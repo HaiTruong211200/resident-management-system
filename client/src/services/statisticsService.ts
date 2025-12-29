@@ -49,31 +49,91 @@ export interface HouseholdStatistics {
 /**
  * Service quản lý các API thống kê
  */
+// Simple in-memory cache to avoid refetching when switching pages
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+const cache: {
+  paymentTypes: { timestamp: number; data: PaymentTypeStatistics[] | null };
+  dashboard: { timestamp: number; data: DashboardStatistics | null };
+  household: Map<
+    string,
+    { timestamp: number; data: HouseholdStatistics | null }
+  >;
+} = {
+  paymentTypes: { timestamp: 0, data: null },
+  dashboard: { timestamp: 0, data: null },
+  household: new Map(),
+};
+
 export const StatisticsService = {
   /**
    * Lấy thống kê tổng quan cho dashboard
    */
-  async getDashboardStatistics() {
+  async getDashboardStatistics({ force = false } = {}) {
+    if (
+      !force &&
+      cache.dashboard.data &&
+      Date.now() - cache.dashboard.timestamp < CACHE_TTL
+    ) {
+      return cache.dashboard.data;
+    }
+
     const response = await api.get("/statistics/dashboard");
-    // Backend trả về: {data: {statistics: {...}}}
-    // Axios wraps nó thành: {data: {data: {statistics: {...}}}, status: 200, ...}
-    const statistics = response.data.data?.statistics || response.data.statistics || response.data;
+    const statistics =
+      response.data.data?.statistics ||
+      response.data.statistics ||
+      response.data;
+    cache.dashboard = { timestamp: Date.now(), data: statistics };
     return statistics;
   },
 
   /**
    * Lấy thống kê theo từng loại khoản thu
    */
-  async getPaymentTypeStatistics() {
+  async getPaymentTypeStatistics({ force = false } = {}): Promise<
+    PaymentTypeStatistics[]
+  > {
+    if (
+      !force &&
+      cache.paymentTypes.data &&
+      Date.now() - cache.paymentTypes.timestamp < CACHE_TTL
+    ) {
+      return cache.paymentTypes.data as PaymentTypeStatistics[];
+    }
+
     const response = await api.get("/statistics/payment-types");
-    return response;
+    const data =
+      response.data.data?.statistics ||
+      response.data.statistics ||
+      response.data;
+    cache.paymentTypes = { timestamp: Date.now(), data };
+    return data;
   },
 
   /**
    * Lấy thống kê cho một hộ gia đình cụ thể
    */
-  async getHouseholdStatistics(householdId: string) {
+  async getHouseholdStatistics(
+    householdId: string,
+    { force = false } = {}
+  ): Promise<HouseholdStatistics> {
+    const entry = cache.household.get(householdId);
+    if (!force && entry && Date.now() - entry.timestamp < CACHE_TTL) {
+      return entry.data as HouseholdStatistics;
+    }
+
     const response = await api.get(`/statistics/household/${householdId}`);
-    return response;
+    const data =
+      response.data.data?.statistics ||
+      response.data.statistics ||
+      response.data;
+    cache.household.set(householdId, { timestamp: Date.now(), data });
+    return data;
+  },
+
+  clearStatisticsCache() {
+    cache.paymentTypes = { timestamp: 0, data: null };
+    cache.dashboard = { timestamp: 0, data: null };
+    cache.household.clear();
   },
 };

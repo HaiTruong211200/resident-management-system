@@ -1,147 +1,135 @@
-const {getSupabase} = require('../config/db');
-const {sendSuccess, sendError} = require('../utils/response');
+const { getSupabase } = require("../config/db");
+const { sendSuccess, sendError } = require("../utils/response");
 
 async function getDashboardStatistics(req, res) {
   try {
     const supabase = getSupabase();
+    const currentYear = new Date().getFullYear();
 
-    // Get total households
-    const {count: totalHouseholds, error: householdsError} =
-        await supabase.from('households')
-            .select('id', {count: 'exact', head: true});
+    // Tính toán ngày bắt đầu cho biểu đồ 12 tháng (Start date 11 tháng trước)
+    const now = new Date();
+    const oneYearAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const startDateStr = oneYearAgo.toISOString().split("T")[0];
 
-    if (householdsError) throw householdsError;
+    // 1. CHẠY SONG SONG CÁC QUERY ĐỘC LẬP
+    // Thay vì await từng cái, ta gom lại chạy 1 lần
+    const [
+      householdsRes,
+      residentsRes,
+      paymentTypesRes,
+      paymentsRes,
+      residentsAgeRes,
+    ] = await Promise.all([
+      // Tổng hộ khẩu
+      supabase.from("households").select("id", { count: "exact", head: true }),
 
-    // Get total residents
-    const {count: totalResidents, error: residentsError} =
-        await supabase.from('residents')
-            .select('id', {count: 'exact', head: true});
+      // Tổng nhân khẩu
+      supabase.from("residents").select("id", { count: "exact", head: true }),
 
-    if (residentsError) throw residentsError;
+      // Các loại phí (để map tên/loại)
+      supabase.from("paymentTypes").select("paymentTypeId, type"),
 
-    // Get all payment types to categorize fees vs funds
-    const {data: paymentTypes, error: ptError} =
-        await supabase.from('paymentTypes').select('paymentTypeId, type');
+      // Lấy TẤT CẢ các khoản thanh toán (chỉ lấy cột cần thiết để tính toán)
+      // Lưu ý: Nếu dữ liệu quá lớn (hàng triệu dòng), cần dùng RPC (Database Function) thay vì xử lý ở JS.
+      supabase
+        .from("householdPayments")
+        .select("amountPaid, paymentTypeId, paymentDate")
+        .order("paymentDate", { ascending: false }), // Order để lấy 10 giao dịch gần nhất luôn
 
-    if (ptError) throw ptError;
+      // Lấy ngày sinh để tính độ tuổi
+      supabase
+        .from("residents")
+        .select("dateOfBirth")
+        .not("dateOfBirth", "is", null),
+    ]);
 
-    const paymentTypeMap = {};
-    paymentTypes?.forEach((pt) => {
+    // Kiểm tra lỗi chung
+    if (householdsRes.error) throw householdsRes.error;
+    if (residentsRes.error) throw residentsRes.error;
+    if (paymentTypesRes.error) throw paymentTypesRes.error;
+    if (paymentsRes.error) throw paymentsRes.error;
+    if (residentsAgeRes.error) throw residentsAgeRes.error;
+
+    // 2. XỬ LÝ DỮ LIỆU TRÊN RAM (JS)
+
+    // --- Map Payment Types ---
+    const paymentTypeMap = {}; // { id: 'Bắt buộc' | 'Tự nguyện' }
+    paymentTypesRes.data.forEach((pt) => {
       paymentTypeMap[pt.paymentTypeId] = pt.type;
     });
 
-    // Get all payments with amounts
-    const {data: payments, error: paymentsError} =
-        await supabase.from('householdPayments').select('*');
-
-    if (paymentsError) throw paymentsError;
-
+    // --- Xử lý Payments (Tổng tiền & Biểu đồ tháng) ---
     let totalFees = 0;
     let totalFunds = 0;
 
-    payments?.forEach((payment) => {
+    // Khởi tạo map cho 12 tháng
+    const monthlyStats = {};
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        "0"
+      )}`; // Key: YYYY-MM
+      monthlyStats[key] = {
+        month: `T${String(d.getMonth() + 1).padStart(2, "0")}`,
+        fees: 0,
+        funds: 0,
+      };
+    }
+
+    const allPayments = paymentsRes.data;
+
+    allPayments.forEach((payment) => {
       const amount = parseFloat(payment.amountPaid) || 0;
       const type = paymentTypeMap[payment.paymentTypeId];
 
-      if (type === 'Bắt buộc') {
-        totalFees += amount;
-      } else if (type === 'Tự nguyện') {
-        totalFunds += amount;
+      // 1. Tính tổng toàn cục
+      if (type === "Bắt buộc") totalFees += amount;
+      else if (type === "Tự nguyện") totalFunds += amount;
+
+      // 2. Tính biểu đồ tháng (chỉ nếu paymentDate nằm trong khoảng 12 tháng gần đây)
+      if (payment.paymentDate && payment.paymentDate >= startDateStr) {
+        const monthKey = payment.paymentDate.substring(0, 7); // Lấy YYYY-MM
+        if (monthlyStats[monthKey]) {
+          if (type === "Bắt buộc") monthlyStats[monthKey].fees += amount;
+          else if (type === "Tự nguyện") monthlyStats[monthKey].funds += amount;
+        }
       }
     });
 
-    // Get age distribution of residents
-    const {data: residentsWithAge, error: ageError} =
-        await supabase.from('residents')
-            .select('dateOfBirth')
-            .not('dateOfBirth', 'is', null);
+    // Chuyển object monthlyStats thành array và đảo ngược cho đúng thứ tự thời gian
+    const monthlyCollection = Object.values(monthlyStats)
+      .reverse()
+      .map((m) => ({ ...m, total: m.fees + m.funds }));
 
-    if (ageError) throw ageError;
-
+    // --- Xử lý Age Distribution ---
     const ageDistribution = {
-      '0-17': 0,
-      '18-30': 0,
-      '31-45': 0,
-      '46-60': 0,
-      '60+': 0,
+      "0-17": 0,
+      "18-30": 0,
+      "31-45": 0,
+      "46-60": 0,
+      "60+": 0,
     };
 
-    const currentYear = new Date().getFullYear();
-    residentsWithAge.forEach((resident) => {
+    residentsAgeRes.data.forEach((resident) => {
       const birthYear = new Date(resident.dateOfBirth).getFullYear();
       const age = currentYear - birthYear;
 
-      if (age < 18)
-        ageDistribution['0-17']++;
-      else if (age <= 30)
-        ageDistribution['18-30']++;
-      else if (age <= 45)
-        ageDistribution['31-45']++;
-      else if (age <= 60)
-        ageDistribution['46-60']++;
-      else
-        ageDistribution['60+']++;
+      if (age < 18) ageDistribution["0-17"]++;
+      else if (age <= 30) ageDistribution["18-30"]++;
+      else if (age <= 45) ageDistribution["31-45"]++;
+      else if (age <= 60) ageDistribution["46-60"]++;
+      else ageDistribution["60+"]++;
     });
 
-    // Get monthly collection data (last 12 months)
-    const monthlyCollection = [];
-    const now = new Date();
-
-    for (let i = 11; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-      const monthStr = `T${String(month).padStart(2, '0')}`;
-
-      const startDate =
-          new Date(year, month - 1, 1).toISOString().split('T')[0];
-
-      const endDate =
-          new Date(year, month, 0).toISOString().split('T')[0];  // Last day
-
-      const {data: monthPayments, error: monthError} =
-          await supabase.from('householdPayments')
-              .select('amountPaid, paymentTypeId')
-              .gte('paymentDate', startDate)
-              .lte('paymentDate', endDate);
-
-      if (monthError) throw monthError;
-
-      let monthFees = 0;
-      let monthFunds = 0;
-
-      monthPayments.forEach((payment) => {
-        const amount = parseFloat(payment.amountPaid) || 0;
-        const type = paymentTypeMap[payment.paymentTypeId];
-
-        if (type === 'Bắt buộc') {
-          monthFees += amount;
-        } else if (type === 'Tự nguyện') {
-          monthFunds += amount;
-        }
-      });
-
-      monthlyCollection.push({
-        month: monthStr,
-        fees: monthFees,
-        funds: monthFunds,
-        total: monthFees + monthFunds,
-      });
-    }
-
-    // Get recent transactions
-    const {data: recentTransactions, error: recentError} =
-        await supabase.from('householdPayments')
-            .select('*')
-            .order('paymentDate', {ascending: false})
-            .limit(10);
-
-    if (recentError) throw recentError;
+    // --- Recent Transactions ---
+    // Vì ta đã order ở query, chỉ cần slice 10 phần tử đầu
+    const recentTransactions = allPayments.slice(0, 10);
 
     return sendSuccess(res, {
       statistics: {
-        totalHouseholds: totalHouseholds || 0,
-        totalResidents: totalResidents || 0,
+        totalHouseholds: householdsRes.count || 0,
+        totalResidents: residentsRes.count || 0,
         totalFees,
         totalFunds,
         totalCollection: totalFees + totalFunds,
@@ -151,11 +139,11 @@ async function getDashboardStatistics(req, res) {
       },
     });
   } catch (err) {
-    console.error('Error fetching statistics:', err);
+    console.error("Error fetching statistics:", err);
     return sendError(res, {
       status: 500,
-      message: 'Failed to fetch statistics',
-      code: 'STATISTICS_ERROR',
+      message: "Failed to fetch statistics",
+      code: "STATISTICS_ERROR",
     });
   }
 }
@@ -164,56 +152,56 @@ async function getPaymentTypeStatistics(req, res) {
   try {
     const supabase = getSupabase();
 
-    const {data: paymentTypes, error: ptError} =
-        await supabase.from('paymentTypes').select('*');
+    // CHẠY SONG SONG: Lấy danh sách loại phí VÀ toàn bộ payments
+    const [typesRes, paymentsRes] = await Promise.all([
+      supabase.from("paymentTypes").select("*"),
+      supabase
+        .from("householdPayments")
+        .select("amountPaid, status, paymentTypeId"),
+    ]);
 
-    if (ptError) throw ptError;
+    if (typesRes.error) throw typesRes.error;
+    if (paymentsRes.error) throw paymentsRes.error;
 
-    const statistics = [];
+    // Tạo map để gom nhóm dữ liệu
+    // Key: paymentTypeId, Value: Object thống kê
+    const statsMap = {};
 
-    for (const pt of paymentTypes) {
-      const {data: payments, error: paymentsError} =
-          await supabase.from('householdPayments')
-              .select('amountPaid, status')
-              .eq('paymentTypeId', pt.paymentTypeId);
-
-      if (paymentsError) throw paymentsError;
-
-      let totalCollected = 0;
-      let paidCount = 0;
-      let unpaidCount = 0;
-      let partialCount = 0;
-
-      payments.forEach((payment) => {
-        totalCollected += parseFloat(payment.amountPaid) || 0;
-
-        if (payment.status === 'Đã đóng')
-          paidCount++;
-        else if (payment.status === 'Chưa đóng' || payment.status === 'Quá hạn')
-          unpaidCount++;
-        else if (payment.status === 'Một phần')
-          partialCount++;
-      });
-
-      statistics.push({
+    // Khởi tạo map
+    typesRes.data.forEach((pt) => {
+      statsMap[pt.paymentTypeId] = {
         paymentTypeId: pt.paymentTypeId,
         name: pt.name,
         type: pt.type,
-        totalCollected,
-        totalPayments: payments.length,
-        paidCount,
-        unpaidCount,
-        partialCount,
-      });
-    }
+        totalCollected: 0,
+        totalPayments: 0,
+        paidCount: 0,
+        unpaidCount: 0,
+        partialCount: 0,
+      };
+    });
 
-    return sendSuccess(res, {statistics});
+    // Loop 1 lần duy nhất qua bảng Payments (O(n)) thay vì Loop lồng nhau (O(n*m))
+    paymentsRes.data.forEach((p) => {
+      const stats = statsMap[p.paymentTypeId];
+      if (stats) {
+        stats.totalPayments++;
+        stats.totalCollected += parseFloat(p.amountPaid) || 0;
+
+        if (p.status === "Đã đóng") stats.paidCount++;
+        else if (p.status === "Chưa đóng" || p.status === "Quá hạn")
+          stats.unpaidCount++;
+        else if (p.status === "Một phần") stats.partialCount++;
+      }
+    });
+
+    return sendSuccess(res, { statistics: Object.values(statsMap) });
   } catch (err) {
-    console.error('Error fetching payment type statistics:', err);
+    console.error("Error fetching payment type statistics:", err);
     return sendError(res, {
       status: 500,
-      message: 'Failed to fetch payment type statistics',
-      code: 'PAYMENT_TYPE_STATISTICS_ERROR',
+      message: "Failed to fetch payment type statistics",
+      code: "PAYMENT_TYPE_STATISTICS_ERROR",
     });
   }
 }
@@ -221,67 +209,62 @@ async function getPaymentTypeStatistics(req, res) {
 async function getHouseholdStatistics(req, res) {
   try {
     const supabase = getSupabase();
-    const {householdId} = req.params;
+    const { householdId } = req.params;
 
     if (!householdId) {
       return sendError(res, {
         status: 400,
-        message: 'Household ID is required',
-        code: 'MISSING_HOUSEHOLD_ID',
+        message: "Household ID is required",
+        code: "MISSING_HOUSEHOLD_ID",
       });
     }
 
-    const {data: household, error: householdError} =
-        await supabase.from('households')
-            .select('*')
-            .eq('id', householdId)
-            .single();
+    // CHẠY SONG SONG 3 REQUEST
+    const [householdRes, paymentsRes, residentsRes] = await Promise.all([
+      supabase.from("households").select("*").eq("id", householdId).single(),
 
-    if (householdError) throw householdError;
+      supabase
+        .from("householdPayments")
+        .select("amountPaid, status") // Chỉ select cột cần thiết
+        .eq("householdId", householdId),
 
-    const {data: payments, error: paymentsError} =
-        await supabase.from('householdPayments')
-            .select('*')
-            .eq('householdId', householdId);
+      supabase
+        .from("residents")
+        .select("id", { count: "exact", head: true })
+        .eq("householdId", householdId)
+        .is("deletedAt", null),
+    ]);
 
-    if (paymentsError) throw paymentsError;
+    if (householdRes.error) throw householdRes.error;
+    if (paymentsRes.error) throw paymentsRes.error;
+    if (residentsRes.error) throw residentsRes.error;
 
     let totalPaid = 0;
     let paidCount = 0;
     let unpaidCount = 0;
 
-    payments.forEach((payment) => {
+    paymentsRes.data.forEach((payment) => {
       totalPaid += parseFloat(payment.amountPaid) || 0;
-      if (payment.status === 'Đã đóng')
-        paidCount++;
-      else
-        unpaidCount++;
+      if (payment.status === "Đã đóng") paidCount++;
+      else unpaidCount++;
     });
-
-    const {count: residentsCount, error: residentsError} =
-        await supabase.from('residents')
-            .select('*', {count: 'exact', head: true})
-            .eq('householdId', householdId)
-            .is('deletedAt', null);
-
-    if (residentsError) throw residentsError;
 
     return sendSuccess(res, {
       statistics: {
-        household,
+        household: householdRes.data,
         totalPaid,
-        totalPayments: payments.length,
+        totalPayments: paymentsRes.data.length,
         paidCount,
         unpaidCount,
-        residentsCount: residentsCount || 0,
+        residentsCount: residentsRes.count || 0,
       },
     });
   } catch (err) {
-    console.error('Error fetching household statistics:', err);
+    console.error("Error fetching household statistics:", err);
     return sendError(res, {
       status: 500,
-      message: 'Failed to fetch household statistics',
-      code: 'HOUSEHOLD_STATISTICS_ERROR',
+      message: "Failed to fetch household statistics",
+      code: "HOUSEHOLD_STATISTICS_ERROR",
     });
   }
 }

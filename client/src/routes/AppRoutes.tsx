@@ -15,8 +15,8 @@ import { StatisticsPage } from "../pages/StatisticsPage";
 import { Unknown } from "../pages/unknown/Unknown";
 
 export const AppRoutes = () => {
-  //   const { isAuthenticated } = useAppContext();
-  const isAuthenticated = true;
+  const { isAuthenticated } = useAppContext();
+  // const isAuthenticated = true;
   const navigate = useNavigate();
   const {
     householdSelectedId,
@@ -71,10 +71,7 @@ export const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
-        <Route
-          index
-          element={<HouseholdPage onSelectHousehold={handleHouseholdSelect} />}
-        />
+        <Route index element={<StatisticsPage />} />
         <Route
           path="households"
           element={<HouseholdPage onSelectHousehold={handleHouseholdSelect} />}

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { User, Lock, Mail, CheckCircle2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { AuthService } from "../../services/authService";
 
 export const LoginPage: React.FC = () => {
   const { login } = useAppContext();
@@ -10,6 +11,7 @@ export const LoginPage: React.FC = () => {
 
   const [isSignUpActive, setIsSignUpActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSignUpLoading, setIsSignUpLoading] = useState(false);
 
   // Form States
   const [loginData, setLoginData] = useState({ email: "", password: "" });
@@ -40,11 +42,14 @@ export const LoginPage: React.FC = () => {
     }
 
     setIsLoading(true);
-    // Simulate login logic -> Extract username from email for demo
-    const username = loginData.email.split("@")[0];
-    await login(username);
-    setIsLoading(false);
-    navigate("/");
+    try {
+      await login(loginData.email, loginData.password);
+      navigate("/");
+    } catch (err: any) {
+      toast.error(err.message || "Đăng nhập thất bại");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSignUp = (e: React.FormEvent) => {
@@ -62,10 +67,26 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    // Simulate Registration
-    toast.success("Đăng ký tài khoản thành công! Vui lòng đăng nhập.");
-    setLoginData({ email: registerData.email, password: "" });
-    setIsSignUpActive(false); // Switch back to login
+    setIsSignUpLoading(true);
+    (async () => {
+      try {
+        console.log("Registering:", registerData);
+        await AuthService.register(
+          registerData.username,
+          registerData.email,
+          registerData.password
+        );
+        // Auto-login after registration
+        await login(registerData.email, registerData.password);
+        toast.success("Đăng ký thành công. Bạn đã được đăng nhập.");
+        setIsSignUpActive(false);
+        navigate("/");
+      } catch (err: any) {
+        toast.error(err.message || "Đăng ký thất bại");
+      } finally {
+        setIsSignUpLoading(false);
+      }
+    })();
   };
 
   return (
