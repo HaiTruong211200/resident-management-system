@@ -197,65 +197,177 @@ export const StatisticsPage: React.FC = () => {
             })}
           </div>
 
-          {/* Charts Grid */}
-          <div className="grid grid-cols-2 gap-6">
-            {/* Age Statistics Chart */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-800 mb-6">
-                Thống kê độ tuổi cư dân
-              </h2>
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart
-                  data={ageChartData}
-                  margin={{ bottom: 60, left: 0, right: 0, top: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="name"
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#a855f7" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Age Distribution Chart */}
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-2xl p-8 shadow-sm mb-6">
+            <h2 className="text-xl font-bold text-slate-800 mb-8">
+              Thống kê độ tuổi cư dân
+            </h2>
+            <div className="space-y-6">
+              {ageChartData.map((item, index) => {
+                const total = ageChartData.reduce((sum, d) => sum + d.count, 0);
+                const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
+                
+                return (
+                  <div key={index} className="flex items-center gap-4">
+                    <div className="w-40 text-sm font-medium text-slate-700">
+                      {item.name}
+                    </div>
+                    <div className="flex-1 flex items-center gap-3">
+                      <div className="flex-1 bg-white rounded-full h-8 relative overflow-hidden shadow-sm">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full flex items-center justify-end pr-3 transition-all duration-500"
+                          style={{ width: `${percentage}%` }}
+                        >
+                          {item.count > 0 && (
+                            <span className="text-xs font-semibold text-white">
+                              {item.count}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="w-12 text-right text-sm font-semibold text-slate-700">
+                        {percentage}%
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+          </div>
 
-            {/* Fee Comparison Chart */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-800 mb-6">
-                So sánh thu phí và thu quỹ trong 12 tháng
-              </h2>
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={feeData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip
-                    formatter={(value) => formatCurrency(value as number)}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="fees"
-                    stroke="#22c55e"
-                    strokeWidth={2}
-                    name="Thu phí"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="funds"
-                    stroke="#16a34a"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    name="Thu quỹ"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+          {/* Monthly Collection Line Chart */}
+          <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-8 shadow-sm">
+            <h2 className="text-xl font-bold text-slate-800 mb-6">
+              So sánh tổng thu phí và tổng thu quỹ trong 12 tháng
+            </h2>
+            <div className="flex gap-6 mb-8">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-1 bg-green-500 rounded"></div>
+                <span className="text-sm font-medium text-slate-700">Tổng thu phí</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-1 bg-orange-500 rounded"></div>
+                <span className="text-sm font-medium text-slate-700">Tổng thu quỹ</span>
+              </div>
             </div>
+            {feeData.length > 0 && (
+              <div className="relative w-full" style={{ height: '400px' }}>
+                <canvas
+                  id="lineChart"
+                  ref={(canvas) => {
+                    if (!canvas || feeData.length === 0) return;
+                    
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) return;
+
+                    // Set canvas size
+                    canvas.width = canvas.offsetWidth;
+                    canvas.height = canvas.offsetHeight;
+
+                    // Chart dimensions
+                    const padding = 60;
+                    const chartWidth = canvas.width - padding * 2;
+                    const chartHeight = canvas.height - padding * 2;
+
+                    // Find max value
+                    const maxValue = Math.max(
+                      ...feeData.map(d => Math.max(d.fees || 0, d.funds || 0))
+                    );
+
+                    // Helper functions
+                    const getX = (index: number) => padding + (index / (feeData.length - 1)) * chartWidth;
+                    const getY = (value: number) => canvas.height - padding - (value / maxValue) * chartHeight;
+
+                    // Clear canvas with gradient background
+                    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                    gradient.addColorStop(0, '#faf5f0');
+                    gradient.addColorStop(1, '#fef3c7');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    // Draw grid lines
+                    ctx.strokeStyle = '#fde68a';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i <= 4; i++) {
+                      const y = padding + (chartHeight / 4) * i;
+                      ctx.beginPath();
+                      ctx.moveTo(padding, y);
+                      ctx.lineTo(canvas.width - padding, y);
+                      ctx.stroke();
+                    }
+
+                    // Draw axes
+                    ctx.strokeStyle = '#d97706';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(padding, padding);
+                    ctx.lineTo(padding, canvas.height - padding);
+                    ctx.lineTo(canvas.width - padding, canvas.height - padding);
+                    ctx.stroke();
+
+                    // Draw fees line
+                    ctx.strokeStyle = '#22c55e';
+                    ctx.lineWidth = 3;
+                    ctx.lineJoin = 'round';
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    feeData.forEach((d, i) => {
+                      const x = getX(i);
+                      const y = getY(d.fees || 0);
+                      if (i === 0) ctx.moveTo(x, y);
+                      else ctx.lineTo(x, y);
+                    });
+                    ctx.stroke();
+
+                    // Draw funds line
+                    ctx.strokeStyle = '#f97316';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    feeData.forEach((d, i) => {
+                      const x = getX(i);
+                      const y = getY(d.funds || 0);
+                      if (i === 0) ctx.moveTo(x, y);
+                      else ctx.lineTo(x, y);
+                    });
+                    ctx.stroke();
+
+                    // Draw dots for fees
+                    ctx.fillStyle = '#22c55e';
+                    feeData.forEach((d, i) => {
+                      ctx.beginPath();
+                      ctx.arc(getX(i), getY(d.fees || 0), 5, 0, Math.PI * 2);
+                      ctx.fill();
+                    });
+
+                    // Draw dots for funds
+                    ctx.fillStyle = '#f97316';
+                    feeData.forEach((d, i) => {
+                      ctx.beginPath();
+                      ctx.arc(getX(i), getY(d.funds || 0), 5, 0, Math.PI * 2);
+                      ctx.fill();
+                    });
+
+                    // Draw X-axis labels
+                    ctx.fillStyle = '#475569';
+                    ctx.font = '12px sans-serif';
+                    ctx.textAlign = 'center';
+                    feeData.forEach((d, i) => {
+                      ctx.fillText(d.month, getX(i), canvas.height - padding + 25);
+                    });
+
+                    // Draw Y-axis labels
+                    ctx.textAlign = 'right';
+                    for (let i = 0; i <= 4; i++) {
+                      const value = (maxValue / 4) * i;
+                      const y = canvas.height - padding - (chartHeight / 4) * i;
+                      const label = (value / 1000000).toFixed(1) + 'M';
+                      ctx.fillText(label, padding - 10, y + 4);
+                    }
+                  }}
+                  className="w-full h-full"
+                />
+              </div>
+            )}
           </div>
         </>
       )}
