@@ -45,10 +45,18 @@ async function update(id, payload) {
   return data;
 }
 
+async function deleteById(id) {
+  const supabase = getSupabase();
+  const {error} =
+      await supabase.from('paymentTypes').delete().eq('paymentTypeId', id);
+  if (error) throw error;
+}
+
 module.exports = {
   create,
   deleteMany,
   list,
   findById,
   update,
+  deleteById,
 };

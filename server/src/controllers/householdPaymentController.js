@@ -112,9 +112,29 @@ async function updateHouseholdPayment(req, res) {
   }
 }
 
+async function deleteHouseholdPayment(req, res) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const payment = await HouseholdPayment.findById(id);
+    if (!payment) {
+      return sendError(res, {
+        status: 404,
+        message: 'Payment not found',
+        code: 'PAYMENT_NOT_FOUND',
+      });
+    }
+    await HouseholdPayment.deleteById(id);
+    return sendSuccess(res, {message: 'Payment deleted successfully'});
+  } catch (err) {
+    console.error(err);
+    return sendError(res);
+  }
+}
+
 module.exports = {
   createHouseholdPayment,
   listHouseholdPayments,
   getHouseholdPaymentById,
   updateHouseholdPayment,
+  deleteHouseholdPayment,
 };

@@ -419,9 +419,17 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                         <Edit2 size={18} />
                       </button>
                       <button
-                        onClick={() => {
-                          if (window.confirm("Xóa nhân khẩu này?"))
-                            deleteResident(resident.id);
+                        onClick={async () => {
+                          if (window.confirm("Xóa nhân khẩu này?")) {
+                            try {
+                              await deleteResident(resident.id);
+                            } catch (error) {
+                              console.error(
+                                "Failed to delete resident:",
+                                error
+                              );
+                            }
+                          }
                         }}
                         className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                         title="Xóa"

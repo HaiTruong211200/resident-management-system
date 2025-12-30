@@ -6,10 +6,13 @@ const {
   findById: findResidentById,
   getAllResidents,
   deleteResident,
+  findAllHouseholdOwners,
+  updateRelationship,
 } = require('../models/Resident');
 const {
   findById: findHouseholdById,
   updateNumberCount,
+  updateHousehold,
 } = require('../models/Household');
 const {
   sendSuccess,
@@ -31,7 +34,8 @@ async function validateAgeForRelationship(residentData, householdHeadId) {
   const relationship = residentData.relationshipToHead.toLowerCase();
 
   // Only validate for specific relationships
-  if (!['Con', 'Cha/Mẹ'].some((rel) => relationship.includes(rel))) {
+  if (!['Con', 'Cha/Mẹ', 'Ông/Bà', 'Cháu'].some(
+          (rel) => relationship.includes(rel.toLowerCase()))) {
     return {valid: true};
   }
 
@@ -59,7 +63,7 @@ async function validateAgeForRelationship(residentData, householdHeadId) {
   }
 
   // Parent relationship - must be at least 18 years older
-  if (['Cha/Mẹ'].some((rel) => relationship.includes(rel))) {
+  if (relationship.includes('Cha/Mẹ')) {
     if (new Date(residentData.dateOfBirth) >= new Date(head.dateOfBirth)) {
       return {
         valid: false,
@@ -70,6 +74,40 @@ async function validateAgeForRelationship(residentData, householdHeadId) {
       return {
         valid: false,
         message: 'Parent must be at least 18 years older than household head',
+      };
+    }
+  }
+
+  // Grandchild relationship - must be at least 36 years younger (2 generations)
+  if (relationship.includes('Cháu')) {
+    if (new Date(residentData.dateOfBirth) <= new Date(head.dateOfBirth)) {
+      return {
+        valid: false,
+        message: 'Grandchild must be younger than household head',
+      };
+    }
+    if (ageDiff < 36) {
+      return {
+        valid: false,
+        message:
+            'Grandchild must be at least 36 years younger than household head (minimum 2 generations of 18 years each)',
+      };
+    }
+  }
+
+  // Grandparent relationship - must be at least 36 years older (2 generations)
+  if (relationship.includes('Ông/Bà')) {
+    if (new Date(residentData.dateOfBirth) >= new Date(head.dateOfBirth)) {
+      return {
+        valid: false,
+        message: 'Grandparent must be older than household head',
+      };
+    }
+    if (ageDiff < 36) {
+      return {
+        valid: false,
+        message:
+            'Grandparent must be at least 36 years older than household head (minimum 2 generations of 18 years each)',
       };
     }
   }
@@ -85,6 +123,19 @@ async function createResidentHandler(req, res) {
     const payload = req.body;
     let household = null;
 
+    // Validate idCardIssueDate against dateOfBirth
+    if (payload.idCardIssueDate && payload.dateOfBirth) {
+      const dob = new Date(payload.dateOfBirth);
+      const issueDate = new Date(payload.idCardIssueDate);
+      if (issueDate <= dob) {
+        return sendError(res, {
+          status: 400,
+          message: 'idCardIssueDate must be after dateOfBirth',
+          code: 'INVALID_ID_CARD_ISSUE_DATE',
+        });
+      }
+    }
+
     if (payload.householdId) {
       household = await findHouseholdById(payload.householdId);
       if (!household)
@@ -93,6 +144,20 @@ async function createResidentHandler(req, res) {
           message: 'Household not found',
           code: 'HOUSEHOLD_NOT_FOUND',
         });
+
+      // Check if adding a new household owner
+      if (payload.relationshipToHead === 'Chủ hộ') {
+        const existingOwners =
+            await findAllHouseholdOwners(payload.householdId);
+        if (existingOwners && existingOwners.length > 0) {
+          // Change all existing owners' relationship to "Khác"
+          for (const owner of existingOwners) {
+            await updateRelationship(owner.id, 'Khác');
+            console.log(
+                `Changed existing owner ${owner.id} relationship to 'Khác'`);
+          }
+        }
+      }
 
       // Validate age if household has a head
       if (household.householdHeadId) {
@@ -146,8 +211,97 @@ async function updateResidentHandler(req, res) {
         code: 'RESIDENT_NOT_FOUND',
       });
 
+    // Validate idCardIssueDate against dateOfBirth
+    const finalDateOfBirth = payload.dateOfBirth || currentResident.dateOfBirth;
+    const finalIdCardIssueDate =
+        payload.idCardIssueDate || currentResident.idCardIssueDate;
+
+    if (finalIdCardIssueDate && finalDateOfBirth) {
+      const dob = new Date(finalDateOfBirth);
+      const issueDate = new Date(finalIdCardIssueDate);
+      console.log('Validating ID card issue date:', {
+        dob: dob.toISOString(),
+        issueDate: issueDate.toISOString(),
+        isValid: issueDate > dob
+      });
+      if (issueDate <= dob) {
+        console.log('ID card issue date validation failed');
+        return sendError(res, {
+          status: 400,
+          message: 'idCardIssueDate must be after dateOfBirth',
+          code: 'INVALID_ID_CARD_ISSUE_DATE',
+        });
+      }
+    }
+
     const oldHouseholdId = currentResident.householdId;
     const newHouseholdId = payload.householdId;
+
+    // Check if changing relationship to "Chủ hộ"
+    if (payload.relationshipToHead === 'Chủ hộ') {
+      const targetHouseholdId =
+          newHouseholdId !== undefined ? newHouseholdId : oldHouseholdId;
+
+      if (targetHouseholdId) {
+        const existingOwners = await findAllHouseholdOwners(targetHouseholdId);
+        // Change all existing owners (except current resident) to "Khác"
+        if (existingOwners && existingOwners.length > 0) {
+          for (const owner of existingOwners) {
+            if (owner.id !== parseInt(id)) {
+              await updateRelationship(owner.id, 'Khác');
+              console.log(
+                  `Changed existing owner ${owner.id} relationship to 'Khác'`);
+            }
+          }
+        }
+
+        // Update the household's householdHeadId to the new head
+        try {
+          const updatedHousehold = await updateHousehold(
+              targetHouseholdId, {householdHeadId: parseInt(id)});
+          console.log(
+              `Updated household ${targetHouseholdId} householdHeadId to ${id}`,
+              updatedHousehold);
+        } catch (updateError) {
+          console.error(
+              'Error updating household householdHeadId:', updateError);
+          return sendError(res, {
+            status: 500,
+            message: 'Failed to update household head',
+            code: 'HOUSEHOLD_UPDATE_FAILED',
+          });
+        }
+      }
+    }
+
+    // Validate age relationship only if household is changing or
+    // relationship/DOB is being updated
+    if (currentResident.householdId &&
+        (newHouseholdId !== undefined ||
+         payload.relationshipToHead !== undefined ||
+         payload.dateOfBirth !== undefined)) {
+      const targetHouseholdId = newHouseholdId !== undefined ?
+          newHouseholdId :
+          currentResident.householdId;
+
+      if (targetHouseholdId) {
+        const household = await findHouseholdById(targetHouseholdId);
+        if (household && household.householdHeadId &&
+            household.householdHeadId !== parseInt(id)) {
+          const residentData = {...currentResident, ...payload};
+          const ageValidation = await validateAgeForRelationship(
+              residentData, household.householdHeadId);
+          if (!ageValidation.valid) {
+            console.log('Age validation failed:', ageValidation.message);
+            return sendError(res, {
+              status: 400,
+              message: ageValidation.message,
+              code: 'INVALID_AGE_FOR_RELATIONSHIP',
+            });
+          }
+        }
+      }
+    }
 
     if (newHouseholdId !== undefined && newHouseholdId !== oldHouseholdId) {
       // Validate new household exists
@@ -159,20 +313,6 @@ async function updateResidentHandler(req, res) {
             message: 'Invalid household id',
             code: 'INVALID_HOUSEHOLD',
           });
-
-        // Validate age if household has a head
-        if (household.householdHeadId) {
-          const residentData = {...currentResident, ...payload};
-          const ageValidation = await validateAgeForRelationship(
-              residentData, household.householdHeadId);
-          if (!ageValidation.valid) {
-            return sendError(res, {
-              status: 400,
-              message: ageValidation.message,
-              code: 'INVALID_AGE_FOR_RELATIONSHIP',
-            });
-          }
-        }
 
         // Increment new household count
         await updateNumberCount(newHouseholdId, true);

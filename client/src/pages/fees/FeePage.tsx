@@ -24,6 +24,7 @@ import {
   FileText,
   ChevronRight,
   ChevronLeft,
+  Trash2,
 } from "lucide-react";
 
 const ITEMS_PER_PAGE = 5;
@@ -36,8 +37,10 @@ export const FeePage: React.FC = () => {
     residents,
     addPaymentType,
     editPaymentType,
+    deletePaymentType,
     addPayment,
     editPayment,
+    deletePayment,
   } = useAppContext();
   const [activeTab, setActiveTab] = useState<"CAMPAIGNS" | "PAYMENTS">(
     "PAYMENTS"
@@ -58,6 +61,12 @@ export const FeePage: React.FC = () => {
   const [editingPayment, setEditingPayment] = useState<HouseholdPayment | null>(
     null
   );
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    isOpen: boolean;
+    type: "paymentType" | "payment" | null;
+    id: string | null;
+    name: string | null;
+  }>({ isOpen: false, type: null, id: null, name: null });
 
   // Filter States
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("ALL");
@@ -161,6 +170,34 @@ export const FeePage: React.FC = () => {
       });
     }
     setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (
+    type: "paymentType" | "payment",
+    id: string,
+    name: string
+  ) => {
+    setDeleteConfirmModal({ isOpen: true, type, id, name });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmModal.id || !deleteConfirmModal.type) return;
+
+    try {
+      if (deleteConfirmModal.type === "paymentType") {
+        await deletePaymentType(deleteConfirmModal.id);
+      } else {
+        await deletePayment(deleteConfirmModal.id);
+      }
+      setDeleteConfirmModal({
+        isOpen: false,
+        type: null,
+        id: null,
+        name: null,
+      });
+    } catch (error) {
+      console.error("Delete error:", error);
+    }
   };
 
   const handleOpenPaymentModal = (payment?: HouseholdPayment) => {
@@ -318,13 +355,24 @@ export const FeePage: React.FC = () => {
                         : "Tự nguyện"}
                     </span>
                     {camp.canEdit && (
-                      <button
-                        onClick={() => handleOpenCampaignModal(camp)}
-                        className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                        title="Chỉnh sửa khoản thu"
-                      >
-                        <Edit2 size={16} />
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleOpenCampaignModal(camp)}
+                          className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                          title="Chỉnh sửa khoản thu"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleDeleteClick("paymentType", camp.id, camp.name)
+                          }
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Xóa khoản thu"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -538,17 +586,40 @@ export const FeePage: React.FC = () => {
                       </td>
                       <td className="px-4 py-4 text-center">
                         {isEditable ? (
-                          <button
-                            onClick={() => handleOpenPaymentModal(pay)}
-                            className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-all"
-                            title="Cập nhật / Đóng thêm"
-                          >
-                            <Edit2 size={16} />
-                          </button>
+                          <div className="flex justify-center gap-2">
+                            <button
+                              onClick={() => handleOpenPaymentModal(pay)}
+                              className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-all"
+                              title="Cập nhật / Đóng thêm"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const hh = households.find(
+                                  (h) => h.id == pay.householdId
+                                );
+                                const camp = paymentTypes.find(
+                                  (c) => c.id === pay.paymentTypeId
+                                );
+                                handleDeleteClick(
+                                  "payment",
+                                  pay.id,
+                                  `${hh?.ownerName || "Hộ"} - ${
+                                    camp?.name || "Khoản thu"
+                                  }`
+                                );
+                              }}
+                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              title="Xóa thanh toán"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         ) : (
                           <div
                             className="flex justify-center"
-                            title="Không thể chỉnh sửa hóa đơn đã đóng hoặc quá hạn"
+                            title="Không thể chỉnh sửa hoặc xóa hóa đơn đã đóng hoặc quá hạn"
                           >
                             <Ban size={16} className="text-slate-300" />
                           </div>
@@ -1065,6 +1136,57 @@ export const FeePage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+              <AlertCircle size={24} className="text-red-600" />
+            </div>
+            <h3 className="text-xl font-bold text-center text-slate-800 mb-2">
+              Xác nhận xóa
+            </h3>
+            <p className="text-center text-slate-600 mb-6">
+              Bạn có chắc chắn muốn xóa{" "}
+              {deleteConfirmModal.type === "paymentType"
+                ? "khoản thu"
+                : "thanh toán"}{" "}
+              <span className="font-bold text-slate-800">
+                "{deleteConfirmModal.name}"
+              </span>
+              ?
+              {deleteConfirmModal.type === "paymentType" && (
+                <span className="block mt-2 text-sm text-red-600">
+                  Lưu ý: Tất cả các giao dịch liên quan cũng sẽ bị xóa!
+                </span>
+              )}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() =>
+                  setDeleteConfirmModal({
+                    isOpen: false,
+                    type: null,
+                    id: null,
+                    name: null,
+                  })
+                }
+                className="flex-1 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm transition-colors font-bold flex items-center justify-center"
+              >
+                <Trash2 size={18} className="mr-2" />
+                Xóa
+              </button>
+            </div>
           </div>
         </div>
       )}

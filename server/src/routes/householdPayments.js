@@ -7,6 +7,7 @@ const {
   listHouseholdPayments,
   getHouseholdPaymentById,
   updateHouseholdPayment,
+  deleteHouseholdPayment,
 } = require('../controllers/householdPaymentController');
 
 // Admin only routes
@@ -54,7 +55,17 @@ router.post(
           .optional()
           .isISO8601()
           .withMessage('dueDate must be ISO8601')
-          .toDate(),
+          .toDate()
+          .custom((value, {req}) => {
+            if (value && req.body.startDate) {
+              const startDate = new Date(req.body.startDate);
+              const dueDate = new Date(value);
+              if (dueDate <= startDate) {
+                throw new Error('dueDate must be after startDate');
+              }
+            }
+            return true;
+          }),
 
       body('notes')
           .optional({nullable: true, checkFalsy: false})
@@ -95,7 +106,17 @@ router.patch(
           .optional()
           .isISO8601()
           .withMessage('dueDate must be ISO8601')
-          .toDate(),
+          .toDate()
+          .custom((value, {req}) => {
+            if (value && req.body.startDate) {
+              const startDate = new Date(req.body.startDate);
+              const dueDate = new Date(value);
+              if (dueDate <= startDate) {
+                throw new Error('dueDate must be after startDate');
+              }
+            }
+            return true;
+          }),
 
       body('notes')
           .optional({nullable: true, checkFalsy: false})
@@ -112,5 +133,10 @@ router.get('/', auth, listHouseholdPayments);
 // Get household payment by id
 router.get(
     '/:id', auth, [param('id').isInt().toInt()], getHouseholdPaymentById);
+
+// Delete household payment
+router.delete(
+    '/:id', auth, adminOnly, [param('id').isInt().toInt()],
+    deleteHouseholdPayment);
 
 module.exports = router;

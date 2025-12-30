@@ -35,6 +35,7 @@ interface AppContextType {
   deletePaymentType: (id: string) => Promise<void>;
   addPayment: (p: HouseholdPayment) => Promise<void>;
   editPayment: (p: HouseholdPayment) => Promise<void>;
+  deletePayment: (id: string) => Promise<void>;
   setHouseholdSelectedId: (h: string | null) => void;
   setCurrentView: (v: string | null) => void;
   refreshData: () => void; // Thêm hàm để chủ động load lại dữ liệu
@@ -79,16 +80,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  // Chỉ chạy khi AppProvider được mount (lúc này chắc chắn đã đăng nhập)
   useEffect(() => {
     fetchData();
   }, []);
 
-  // --- Actions Logic (Giữ nguyên các hàm xử lý API của bạn nhưng bọc trong async/await sạch sẽ hơn) ---
-
   const addHousehold = async (h: Household) => {
     const resp = await HouseholdService.addHousehold(h);
-    setHouseholds((prev) => [...prev, resp.data.data.household]);
+    // After adding household, the backend also updates the resident's householdId
+    // So we need to refresh both households and residents to sync the state
+    const [resH, resR] = await Promise.all([
+      HouseholdService.getHouseholds(),
+      ResidentService.getResidents({ page: 1, limit: 100 }),
+    ]);
+    setHouseholds(resH.data.data.households);
+    setResidents(resR.data.data.residents);
     toast.success("Thêm hộ khẩu thành công");
   };
 
@@ -102,7 +107,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
   const deleteHousehold = async (id: string) => {
     await HouseholdService.deleteHousehold(id);
-    setHouseholds((prev) => prev.filter((h) => h.id !== id));
+    // Backend clears householdId and changes relationship to "Khác" for residents
+    // So refresh both households and residents to sync the state
+    const [resH, resR] = await Promise.all([
+      HouseholdService.getHouseholds(),
+      ResidentService.getResidents({ page: 1, limit: 100 }),
+    ]);
+    setHouseholds(resH.data.data.households);
+    setResidents(resR.data.data.residents);
     toast.success("Đã xóa hộ khẩu");
   };
 
@@ -115,16 +127,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
   const editResident = async (data: Resident) => {
     const resp = await ResidentService.updateResident(data);
-    setResidents((prev) =>
-      prev.map((r) => (r.id === data.id ? resp.data.data.resident : r))
-    );
+    const updatedResident = resp.data.data.resident;
+
+    // If changing to "Chủ hộ", backend automatically changes other owners to "Khác"
+    // and updates household's householdHeadId, so refresh both residents and households
+    if (data.relationshipToHead === "Chủ hộ") {
+      const [resR, resH] = await Promise.all([
+        ResidentService.getResidents({ page: 1, limit: 100 }),
+        HouseholdService.getHouseholds(),
+      ]);
+      setResidents(resR.data.data.residents);
+      setHouseholds(resH.data.data.households);
+    } else {
+      setResidents((prev) =>
+        prev.map((r) => (r.id === data.id ? updatedResident : r))
+      );
+    }
+
     toast.success("Cập nhật cư dân thành công");
   };
 
   const deleteResident = async (id: number) => {
-    await ResidentService.deleteResident(id);
-    setResidents((prev) => prev.filter((r) => r.id !== id));
-    toast.success("Đã xóa cư dân");
+    try {
+      await ResidentService.deleteResident(id);
+      setResidents((prev) => prev.filter((r) => r.id !== id));
+      toast.success("Đã xóa cư dân");
+    } catch (error: any) {
+      console.error("Delete resident error:", error);
+      toast.error(
+        "Không thể xóa cư dân: " + (error.message || "Unknown error")
+      );
+      throw error;
+    }
   };
 
   const addPaymentType = async (p: PaymentType) => {
@@ -159,6 +193,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       prev.map((p) => (p.id === data.id ? resp.data.data.payment : p))
     );
     toast.success("Cập nhật thanh toán thành công");
+  };
+
+  const deletePayment = async (id: string) => {
+    await HouseholdPaymentService.deleteHouseholdPayment(id);
+    setPayments((prev) => prev.filter((p) => p.id !== id));
+    toast.success("Đã xóa thanh toán");
   };
 
   // --- Computed States ---
@@ -202,6 +242,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         deletePaymentType,
         addPayment,
         editPayment,
+        deletePayment,
         refreshData: fetchData,
       }}
     >

@@ -1,19 +1,19 @@
-const { validationResult } = require("express-validator");
-const PaymentType = require("../models/PaymentType");
-const Household = require("../models/Household");
-const HouseholdPayment = require("../models/HouseholdPayment");
-const Resident = require("../models/Resident");
+const {validationResult} = require('express-validator');
+const PaymentType = require('../models/PaymentType');
+const Household = require('../models/Household');
+const HouseholdPayment = require('../models/HouseholdPayment');
+const Resident = require('../models/Resident');
 const {
   sendSuccess,
   sendError,
   validationFailed,
-} = require("../utils/response");
+} = require('../utils/response');
 
 async function createPaymentType(req, res) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log("Validation errors:", errors.array());
-    console.log("Request body:", req.body);
+    console.log('Validation errors:', errors.array());
+    console.log('Request body:', req.body);
     return validationFailed(res, errors.array());
   }
   try {
@@ -30,33 +30,33 @@ async function createPaymentType(req, res) {
 
     const pt = await PaymentType.create(payload);
 
-    if (pt.type === "Bắt buộc") {
+    if (pt.type === 'Bắt buộc') {
       const households = await Household.getAllHouseholds();
 
       for (const household of households) {
         const numberCount = household.numberCount || 0;
-        console.log("Number count:", numberCount);
-        console.log("Amount per person:", pt.amountPerPerson);
+        console.log('Number count:', numberCount);
+        console.log('Amount per person:', pt.amountPerPerson);
         console.log(numberCount * pt.amountPerPerson);
         await HouseholdPayment.create({
           householdId: household.id,
           paymentTypeId: pt.paymentTypeId,
           amountExpected: pt.amountPerPerson * numberCount,
           amountPaid: 0,
-          status: "Chưa đóng",
+          status: 'Chưa đóng',
           startDate: payload.startDate,
           dueDate: payload.dateExpired || pt.dateExpired,
         });
       }
     }
-    return sendSuccess(res, { paymentType: pt }, { status: 201 });
+    return sendSuccess(res, {paymentType: pt}, {status: 201});
   } catch (err) {
-    if (err && err.code === "23505") {
+    if (err && err.code === '23505') {
       console.log(err);
       return sendError(res, {
         status: 409,
-        message: "Duplicate name",
-        code: "DUPLICATE_PAYMENT_TYPE",
+        message: 'Duplicate name',
+        code: 'DUPLICATE_PAYMENT_TYPE',
       });
     }
     console.error(err);
@@ -64,11 +64,11 @@ async function createPaymentType(req, res) {
   }
 }
 
-module.exports = { createPaymentType };
+module.exports = {createPaymentType};
 async function listPaymentTypes(_req, res) {
   try {
     const list = await PaymentType.list();
-    return sendSuccess(res, { paymentTypes: list });
+    return sendSuccess(res, {paymentTypes: list});
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -82,11 +82,11 @@ async function getPaymentTypeById(req, res) {
     if (!item) {
       return sendError(res, {
         status: 404,
-        message: "Payment type not found",
-        code: "PAYMENT_TYPE_NOT_FOUND",
+        message: 'Payment type not found',
+        code: 'PAYMENT_TYPE_NOT_FOUND',
       });
     }
-    return sendSuccess(res, { paymentType: item });
+    return sendSuccess(res, {paymentType: item});
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -110,30 +110,49 @@ async function updatePaymentType(req, res) {
       description: req.body.description,
     };
 
-    console.log("Update payload:", payload);
+    console.log('Update payload:', payload);
     const pt = await PaymentType.update(id, payload);
 
-    if (pt.type === "Bắt buộc") {
+    if (pt.type === 'Bắt buộc') {
       const households = await Household.getAllHouseholds();
 
       for (const household of households) {
         const numberCount = household.numberCount || 0;
-        console.log("Updating household payment for household:", household.id);
-        console.log("Number count:", numberCount);
-        console.log("Amount per person:", pt.amountPerPerson);
-        console.log("New expected amount:", numberCount * pt.amountPerPerson);
+        console.log('Updating household payment for household:', household.id);
+        console.log('Number count:', numberCount);
+        console.log('Amount per person:', pt.amountPerPerson);
+        console.log('New expected amount:', numberCount * pt.amountPerPerson);
         await HouseholdPayment.updateByPaymentType(
-          pt.paymentTypeId,
-          household.id,
-          {
-            amountExpected: pt.amountPerPerson * (numberCount || 0),
-            startDate: payload.startDate,
-            dueDate: payload.dateExpired,
-          }
-        );
+            pt.paymentTypeId, household.id, {
+              amountExpected: pt.amountPerPerson * (numberCount || 0),
+              startDate: payload.startDate,
+              dueDate: payload.dateExpired,
+            });
       }
     }
-    return sendSuccess(res, { paymentType: pt });
+    return sendSuccess(res, {paymentType: pt});
+  } catch (err) {
+    console.error(err);
+    return sendError(res);
+  }
+}
+
+async function deletePaymentType(req, res) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const item = await PaymentType.findById(id);
+    if (!item) {
+      return sendError(res, {
+        status: 404,
+        message: 'Payment type not found',
+        code: 'PAYMENT_TYPE_NOT_FOUND',
+      });
+    }
+    // Delete all household payments associated with this payment type
+    await HouseholdPayment.deleteByPaymentType(id);
+    // Delete the payment type itself
+    await PaymentType.deleteById(id);
+    return sendSuccess(res, {message: 'Payment type deleted successfully'});
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -145,4 +164,5 @@ module.exports = {
   listPaymentTypes,
   getPaymentTypeById,
   updatePaymentType,
+  deletePaymentType,
 };

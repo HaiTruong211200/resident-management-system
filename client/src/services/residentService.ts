@@ -8,6 +8,7 @@ export const ResidentService = {
 
   addResident(data: Resident) {
     return api.post("/residents", {
+      householdId: data.householdId,
       fullName: data.fullName,
       dateOfBirth: data.dateOfBirth,
       gender: data.gender,

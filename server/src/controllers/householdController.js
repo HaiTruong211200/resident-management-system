@@ -11,6 +11,7 @@ const {
 const {
   findById: findResidentById,
   updateResident,
+  clearHouseholdForResidents,
 } = require('../models/Resident');
 const {
   sendSuccess,
@@ -155,6 +156,11 @@ async function deleteHouseholdHandler(req, res) {
         code: 'HOUSEHOLD_NOT_EMPTY',
       });
     }
+
+    // Clear householdId and change relationship to 'Khác' for all residents
+    const updatedResidents = await clearHouseholdForResidents(id);
+    console.log(
+        `Cleared household data for ${updatedResidents.length} residents`);
 
     await deleteHouseholdDAO(id);
     return sendSuccess(res, {message: 'Household deleted successfully'});
