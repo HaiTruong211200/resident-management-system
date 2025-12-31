@@ -1,46 +1,62 @@
-const { validationResult } = require("express-validator");
-const PaymentType = require("../models/PaymentType");
-const Household = require("../models/Household");
-const HouseholdPayment = require("../models/HouseholdPayment");
-const Resident = require("../models/Resident");
+const {validationResult} = require('express-validator');
+const PaymentType = require('../models/PaymentType');
+const Household = require('../models/Household');
+const HouseholdPayment = require('../models/HouseholdPayment');
+const Resident = require('../models/Resident');
 const {
   sendSuccess,
   sendError,
   validationFailed,
-} = require("../utils/response");
+} = require('../utils/response');
 
 async function createPaymentType(req, res) {
   const errors = validationResult(req);
-  if (!errors.isEmpty()) return validationFailed(res, errors.array());
+  if (!errors.isEmpty()) {
+    console.log('Validation errors:', errors.array());
+    console.log('Request body:', req.body);
+    return validationFailed(res, errors.array());
+  }
   try {
-    const payload = req.body; // {name, pass, type, amount_per_person?, date_created?}
+    const payload = {
+      name: req.body.name,
+      type: req.body.paymentType,
+      pass: req.body.pass,
+      amountPerPerson: req.body.amountPerPerson,
+      createdAt: req.body.createdAt,
+      startDate: req.body.startDate,
+      dateExpired: req.body.dateExpired,
+      description: req.body.description,
+    };
+
     const pt = await PaymentType.create(payload);
 
-    if (pt.paymentType === "Bắt buộc") {
+    if (pt.type === 'Bắt buộc') {
       const households = await Household.getAllHouseholds();
 
       for (const household of households) {
-        const memberCount = household.memberCount || 0;
+        const numberCount = household.numberCount || 0;
+        console.log('Number count:', numberCount);
+        console.log('Amount per person:', pt.amountPerPerson);
+        console.log(numberCount * pt.amountPerPerson);
         await HouseholdPayment.create({
           householdId: household.id,
-          paymentTypeId: pt.id,
-          amountExpected: memberCount * pt.amountPerPerson,
+          paymentTypeId: pt.paymentTypeId,
+          amountExpected: pt.amountPerPerson * numberCount,
           amountPaid: 0,
-          status: "Chưa bắt đầu",
-          category: "Bắt buộc",
-          startDate: pt.startDate,
-          dueDate: pt.dateExpired,
+          status: 'Chưa đóng',
+          startDate: payload.startDate,
+          dueDate: payload.dateExpired || pt.dateExpired,
         });
       }
     }
-    return sendSuccess(res, { paymentType: pt }, { status: 201 });
+    return sendSuccess(res, {paymentType: pt}, {status: 201});
   } catch (err) {
-    if (err && err.code === "23505") {
+    if (err && err.code === '23505') {
       console.log(err);
       return sendError(res, {
         status: 409,
-        message: "Duplicate name",
-        code: "DUPLICATE_PAYMENT_TYPE",
+        message: 'Duplicate name',
+        code: 'DUPLICATE_PAYMENT_TYPE',
       });
     }
     console.error(err);
@@ -48,11 +64,11 @@ async function createPaymentType(req, res) {
   }
 }
 
-module.exports = { createPaymentType };
+module.exports = {createPaymentType};
 async function listPaymentTypes(_req, res) {
   try {
     const list = await PaymentType.list();
-    return sendSuccess(res, { paymentTypes: list });
+    return sendSuccess(res, {paymentTypes: list});
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -66,11 +82,11 @@ async function getPaymentTypeById(req, res) {
     if (!item) {
       return sendError(res, {
         status: 404,
-        message: "Payment type not found",
-        code: "PAYMENT_TYPE_NOT_FOUND",
+        message: 'Payment type not found',
+        code: 'PAYMENT_TYPE_NOT_FOUND',
       });
     }
-    return sendSuccess(res, { paymentType: item });
+    return sendSuccess(res, {paymentType: item});
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -84,23 +100,59 @@ async function updatePaymentType(req, res) {
   if (!errors.isEmpty()) return validationFailed(res, errors.array());
 
   try {
-    const payload = req.body;
-    console.log("Update payload:", payload);
+    const payload = {
+      name: req.body.name,
+      type: req.body.paymentType,
+      amountPerPerson: req.body.amountPerPerson,
+      createdAt: req.body.createdAt,
+      startDate: req.body.startDate,
+      dateExpired: req.body.dateExpired,
+      description: req.body.description,
+    };
+
+    console.log('Update payload:', payload);
     const pt = await PaymentType.update(id, payload);
 
-    if (pt.paymentType === "Bắt buộc") {
+    if (pt.type === 'Bắt buộc') {
       const households = await Household.getAllHouseholds();
 
       for (const household of households) {
-        const memberCount = household.memberCount || 0;
-        await HouseholdPayment.updateByPaymentType(pt.id, {
-          amountExpected: payload.amountPerPerson * memberCount,
-          startDate: payload.startDate,
-          dueDate: payload.dateExpired,
-        });
+        const numberCount = household.numberCount || 0;
+        console.log('Updating household payment for household:', household.id);
+        console.log('Number count:', numberCount);
+        console.log('Amount per person:', pt.amountPerPerson);
+        console.log('New expected amount:', numberCount * pt.amountPerPerson);
+        await HouseholdPayment.updateByPaymentType(
+            pt.paymentTypeId, household.id, {
+              amountExpected: pt.amountPerPerson * (numberCount || 0),
+              startDate: payload.startDate,
+              dueDate: payload.dateExpired,
+            });
       }
     }
-    return sendSuccess(res, { paymentType: pt });
+    return sendSuccess(res, {paymentType: pt});
+  } catch (err) {
+    console.error(err);
+    return sendError(res);
+  }
+}
+
+async function deletePaymentType(req, res) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const item = await PaymentType.findById(id);
+    if (!item) {
+      return sendError(res, {
+        status: 404,
+        message: 'Payment type not found',
+        code: 'PAYMENT_TYPE_NOT_FOUND',
+      });
+    }
+    // Delete all household payments associated with this payment type
+    await HouseholdPayment.deleteByPaymentType(id);
+    // Delete the payment type itself
+    await PaymentType.deleteById(id);
+    return sendSuccess(res, {message: 'Payment type deleted successfully'});
   } catch (err) {
     console.error(err);
     return sendError(res);
@@ -112,4 +164,5 @@ module.exports = {
   listPaymentTypes,
   getPaymentTypeById,
   updatePaymentType,
+  deletePaymentType,
 };

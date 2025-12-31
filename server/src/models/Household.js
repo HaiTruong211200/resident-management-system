@@ -1,12 +1,12 @@
 const {getSupabase} = require('../config/db');
 // ERD-aligned Supabase DAO. Table: households (int PK), columns:
-// householdHeadId, houseNumber, street, ward, district, memberCount (ints)
+// householdHeadId, houseNumber, street, ward, district, numberCount (ints)
 
 async function createHousehold(payload) {
   const supabase = getSupabase();
-  // Ensure memberCount starts at 1 if not provided
-  if (!payload.memberCount) {
-    payload.memberCount = 1;
+  // Ensure numberCount starts at 1 if not provided
+  if (!payload.numberCount) {
+    payload.numberCount = 1;
   }
   const {data, error} =
       await supabase.from('households').insert(payload).select('*').single();
@@ -16,6 +16,8 @@ async function createHousehold(payload) {
 
 async function updateHousehold(id, payload) {
   const supabase = getSupabase();
+  // Add updatedAt timestamp
+  payload.updatedAt = new Date().toISOString();
   const {data, error} = await supabase.from('households')
                             .update(payload)
                             .eq('id', id)
@@ -27,8 +29,11 @@ async function updateHousehold(id, payload) {
 
 async function findById(id) {
   const supabase = getSupabase();
-  const {data, error} =
-      await supabase.from('households').select('*').eq('id', id).maybeSingle();
+  const {data, error} = await supabase.from('households')
+                            .select('*')
+                            .eq('id', id)
+                            .is('deletedAt', null)
+                            .maybeSingle();
   if (error) throw error;
   return data || null;
 }
@@ -46,8 +51,9 @@ async function searchHouseholds(keyword) {
   // If not numeric, no matches for ints; return empty set via impossible filter
   const filter = parts.length ? parts.join(',') : 'id.eq.-1';
   const {data, error} = await supabase.from('households')
-                            .select('*, householdHeaderId')
-                            .or(filter);
+                            .select('*')
+                            .or(filter)
+                            .is('deletedAt', null);
   if (error) throw error;
   return data || [];
 }
@@ -59,26 +65,49 @@ async function deleteMany() {
   if (error) throw error;
 }
 
+async function deleteById(id) {
+  const supabase = getSupabase();
+  const {error} = await supabase.from('households').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
 async function getAllHouseholds() {
   const supabase = getSupabase();
-  const {data, error} =
-      await supabase.from('households').select('*').order('id', {
-        ascending: true
-      });
+  const {data, error} = await supabase.from('households')
+                            .select('*')
+                            .is('deletedAt', null)
+                            .order('id', {ascending: true});
   if (error) throw error;
   return data || [];
 }
 
-async function updateMemberCount(householdId, increment = true) {
+async function updateNumberCount(householdId, increment = true) {
   const supabase = getSupabase();
   const household = await findById(householdId);
   if (!household) throw new Error('Household not found');
 
-  const newCount = increment ? household.memberCount + 1 :
-                               Math.max(0, household.memberCount - 1);
+  const newCount = increment ? household.numberCount + 1 :
+                               Math.max(0, household.numberCount - 1);
+  const {data, error} =
+      await supabase.from('households')
+          .update({numberCount: newCount, updatedAt: new Date().toISOString()})
+          .eq('id', householdId)
+          .select('*')
+          .single();
+  if (error) throw error;
+  return data;
+}
+
+async function softDeleteHousehold(id) {
+  const supabase = getSupabase();
   const {data, error} = await supabase.from('households')
-                            .update({memberCount: newCount})
-                            .eq('id', householdId)
+                            .update({
+                              deletedAt: new Date().toISOString(),
+                              updatedAt: new Date().toISOString()
+                            })
+                            .eq('id', id)
+                            .is('deletedAt', null)
                             .select('*')
                             .single();
   if (error) throw error;
@@ -91,6 +120,8 @@ module.exports = {
   findById,
   searchHouseholds,
   deleteMany,
+  deleteById,
   getAllHouseholds,
-  updateMemberCount,
+  updateNumberCount,
+  softDeleteHousehold,
 };

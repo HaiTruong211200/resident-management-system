@@ -1,17 +1,19 @@
 const express = require('express');
 const {body, param, query} = require('express-validator');
 const router = express.Router();
+const {auth, adminOnly} = require('../middleware/auth');
 
 const householdController = require('../controllers/householdController');
 
 // Get all households
 router.get(
-    '/search', [query('keyword').optional().isString()],
+    '/search', auth, [query('keyword').optional().isString()],
     householdController.searchHouseholds);
-router.get('/', householdController.getAllHouseholds);
+router.get('/', auth, householdController.getAllHouseholds);
 
+// Admin only routes
 router.post(
-    '/',
+    '/', auth, adminOnly,
     [
       body('houseNumber').optional().isInt().toInt(),
       body('street').optional().isString().trim(),
@@ -25,7 +27,12 @@ router.post(
     ],
     householdController.createHousehold);
 
+router.delete(
+    '/:id', auth, adminOnly, [param('id').isString()],
+    householdController.deleteHousehold);
+
 router.put(
-    '/:id', [param('id').isString()], householdController.updateHousehold);
+    '/:id', auth, adminOnly, [param('id').isString()],
+    householdController.updateHousehold);
 
 module.exports = router;
