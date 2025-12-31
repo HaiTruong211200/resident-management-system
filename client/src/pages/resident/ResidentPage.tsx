@@ -89,6 +89,11 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
 
   // State for View Details Modal
   const [viewingItem, setViewingItem] = useState<Resident | null>(null);
+  // State for Delete Confirmation Modal
+  const [residentToDelete, setResidentToDelete] = useState<Resident | null>(
+    null
+  );
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   // Local household filter (select next to search)
   const [localHouseholdFilter, setLocalHouseholdFilter] = useState<string>("");
@@ -419,18 +424,7 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
                         <Edit2 size={18} />
                       </button>
                       <button
-                        onClick={async () => {
-                          if (window.confirm("Xóa nhân khẩu này?")) {
-                            try {
-                              await deleteResident(resident.id);
-                            } catch (error) {
-                              console.error(
-                                "Failed to delete resident:",
-                                error
-                              );
-                            }
-                          }
-                        }}
+                        onClick={() => setResidentToDelete(resident)}
                         className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                         title="Xóa"
                       >
@@ -1024,6 +1018,56 @@ export const ResidentPage: React.FC<ResidentPageProps> = ({
               >
                 Đóng
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* DELETE CONFIRMATION MODAL */}
+      {residentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md flex flex-col">
+            <div className="px-6 py-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-bold">Xác nhận xóa</h3>
+              <button
+                onClick={() => setResidentToDelete(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-slate-700 mb-4">
+                Bạn có chắc muốn xóa nhân khẩu{" "}
+                <span className="font-medium">{residentToDelete.fullName}</span>{" "}
+                không?
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setResidentToDelete(null)}
+                  className="px-4 py-2 bg-white border rounded"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={async () => {
+                    setDeleting(true);
+                    try {
+                      await deleteResident(residentToDelete.id);
+                      await fetchResidents();
+                    } catch (err) {
+                      console.error("Failed to delete resident:", err);
+                    } finally {
+                      setDeleting(false);
+                      setResidentToDelete(null);
+                    }
+                  }}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50"
+                >
+                  {deleting ? "Đang xóa..." : "Xóa"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

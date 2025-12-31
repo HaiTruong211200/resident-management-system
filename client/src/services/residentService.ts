@@ -26,7 +26,7 @@ export const ResidentService = {
   },
 
   updateResident(data: Resident) {
-    return api.put(`/residents/${data.id}`, {
+    return api.patch(`/residents/${data.id}`, {
       householdId: data.householdId,
       fullName: data.fullName,
       dateOfBirth: data.dateOfBirth,

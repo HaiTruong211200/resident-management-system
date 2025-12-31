@@ -10,6 +10,7 @@ import {
   MapPin,
   Eye,
   Home,
+  X,
 } from "lucide-react";
 
 interface HouseholdPageProps {
@@ -32,6 +33,12 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Household | null>(null);
+
+  // Delete confirmation state
+  const [householdToDelete, setHouseholdToDelete] = useState<Household | null>(
+    null
+  );
+  const [deletingHousehold, setDeletingHousehold] = useState<boolean>(false);
 
   // Form State
   const [formData, setFormData] = useState<Partial<Household>>({});
@@ -198,14 +205,7 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
                         <Edit2 size={18} />
                       </button>
                       <button
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              "Xóa hộ khẩu này? Dữ liệu nhân khẩu liên quan sẽ bị ảnh hưởng."
-                            )
-                          )
-                            deleteHousehold(household.id);
-                        }}
+                        onClick={() => setHouseholdToDelete(household)}
                         className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                         title="Xóa"
                       >
@@ -382,6 +382,59 @@ export const HouseholdPage: React.FC<HouseholdPageProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {householdToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md flex flex-col">
+            <div className="px-6 py-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-bold">Xác nhận xóa hộ khẩu</h3>
+              <button
+                onClick={() => setHouseholdToDelete(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-slate-700 mb-4">
+                Bạn có chắc muốn xóa hộ{" "}
+                <span className="font-medium">{householdToDelete.id}</span> -{" "}
+                <span className="font-medium">
+                  {householdToDelete.ownerName || "Không có tên"}
+                </span>
+                ? Dữ liệu nhân khẩu liên quan có thể bị ảnh hưởng.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setHouseholdToDelete(null)}
+                  className="px-4 py-2 bg-white border rounded"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={async () => {
+                    setDeletingHousehold(true);
+                    try {
+                      await deleteHousehold(householdToDelete.id);
+                    } catch (err) {
+                      console.error("Failed to delete household:", err);
+                    } finally {
+                      setDeletingHousehold(false);
+                      setHouseholdToDelete(null);
+                    }
+                  }}
+                  disabled={deletingHousehold}
+                  className="px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50"
+                >
+                  {deletingHousehold ? "Đang xóa..." : "Xóa"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

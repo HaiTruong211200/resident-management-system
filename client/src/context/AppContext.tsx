@@ -88,63 +88,88 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     const resp = await HouseholdService.addHousehold(h);
     // After adding household, the backend also updates the resident's householdId
     // So we need to refresh both households and residents to sync the state
-    const [resH, resR] = await Promise.all([
-      HouseholdService.getHouseholds(),
-      ResidentService.getResidents({ page: 1, limit: 100 }),
-    ]);
-    setHouseholds(resH.data.data.households);
-    setResidents(resR.data.data.residents);
-    toast.success("Thêm hộ khẩu thành công");
+    try {
+      const [resH, resR] = await Promise.all([
+        HouseholdService.getHouseholds(),
+        ResidentService.getResidents({ page: 1, limit: 100 }),
+      ]);
+      setHouseholds(resH.data.data.households);
+      setResidents(resR.data.data.residents);
+      toast.success("Thêm hộ khẩu thành công");
+    } catch (err: any) {
+      toast.error("Không thể tải dữ liệu sau khi thêm hộ khẩu: " + err.message);
+      throw err;
+    }
   };
 
   const editHousehold = async (h: Household) => {
-    const resp = await HouseholdService.updateHousehold(h);
-    setHouseholds((prev) =>
-      prev.map((item) => (item.id === h.id ? resp.data.data.household : item))
-    );
-    toast.success("Cập nhật hộ khẩu thành công");
+    try {
+      const resp = await HouseholdService.updateHousehold(h);
+      setHouseholds((prev) =>
+        prev.map((item) => (item.id === h.id ? resp.data.data.household : item))
+      );
+      toast.success("Cập nhật hộ khẩu thành công");
+    } catch (err: any) {
+      toast.error("Không thể cập nhật hộ khẩu: " + err.message);
+      throw err;
+    }
   };
 
   const deleteHousehold = async (id: string) => {
-    await HouseholdService.deleteHousehold(id);
-    // Backend clears householdId and changes relationship to "Khác" for residents
-    // So refresh both households and residents to sync the state
-    const [resH, resR] = await Promise.all([
-      HouseholdService.getHouseholds(),
-      ResidentService.getResidents({ page: 1, limit: 100 }),
-    ]);
-    setHouseholds(resH.data.data.households);
-    setResidents(resR.data.data.residents);
-    toast.success("Đã xóa hộ khẩu");
+    try {
+      await HouseholdService.deleteHousehold(id);
+      // Backend clears householdId and changes relationship to "Khác" for residents
+      // So refresh both households and residents to sync the state
+      const [resH, resR] = await Promise.all([
+        HouseholdService.getHouseholds(),
+        ResidentService.getResidents({ page: 1, limit: 100 }),
+      ]);
+      setHouseholds(resH.data.data.households);
+      setResidents(resR.data.data.residents);
+      toast.success("Đã xóa hộ khẩu");
+    } catch (err: any) {
+      toast.error("Không thể xóa hộ khẩu: " + err.message);
+      throw err;
+    }
   };
 
   const addResident = async (data: Resident) => {
-    const resp = await ResidentService.addResident(data);
-    setResidents((prev) => [resp.data.data.resident, ...prev]);
-    toast.success("Thêm cư dân thành công");
-    return resp.data.data.resident;
+    try {
+      const resp = await ResidentService.addResident(data);
+      setResidents((prev) => [resp.data.data.resident, ...prev]);
+      toast.success("Thêm cư dân thành công");
+      return resp.data.data.resident;
+    } catch (err: any) {
+      toast.error("Không thể thêm cư dân: " + err.message);
+      throw err;
+    }
   };
 
   const editResident = async (data: Resident) => {
-    const resp = await ResidentService.updateResident(data);
-    const updatedResident = resp.data.data.resident;
+    try {
+      const resp = await ResidentService.updateResident(data);
+      const updatedResident = resp.data.data.resident;
 
-    // If changing to "Chủ hộ", backend automatically changes other owners to "Khác"
-    // and updates household's householdHeadId, so refresh both residents and households
-    if (data.relationshipToHead === "Chủ hộ") {
-      const [resR, resH] = await Promise.all([
-        ResidentService.getResidents({ page: 1, limit: 100 }),
-        HouseholdService.getHouseholds(),
-      ]);
-      setResidents(resR.data.data.residents);
-      setHouseholds(resH.data.data.households);
-    } else {
-      setResidents((prev) =>
-        prev.map((r) => (r.id === data.id ? updatedResident : r))
-      );
+      // If changing to "Chủ hộ", backend automatically changes other owners to "Khác"
+      // and updates household's householdHeadId, so refresh both residents and households
+      if (data.relationshipToHead === "Chủ hộ") {
+        const [resR, resH] = await Promise.all([
+          ResidentService.getResidents({ page: 1, limit: 100 }),
+          HouseholdService.getHouseholds(),
+        ]);
+        setResidents(resR.data.data.residents);
+        setHouseholds(resH.data.data.households);
+      } else {
+        setResidents((prev) =>
+          prev.map((r) => (r.id === data.id ? updatedResident : r))
+        );
+      }
+
+      toast.success("Cập nhật cư dân thành công");
+    } catch (err: any) {
+      toast.error("Không thể cập nhật cư dân: " + err.message);
+      throw err;
     }
-
-    toast.success("Cập nhật cư dân thành công");
   };
 
   const deleteResident = async (id: number) => {
@@ -162,43 +187,75 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const addPaymentType = async (p: PaymentType) => {
-    const resp = await PaymentTypeService.addPaymentType(p);
-    setPaymentTypes((prev) => [...prev, resp.data.data.paymentType]);
-    toast.success("Thêm khoản thu thành công");
+    try {
+      const resp = await PaymentTypeService.addPaymentType(p);
+      setPaymentTypes((prev) => [...prev, resp.data.data.paymentType]);
+      toast.success("Thêm khoản thu thành công");
+    } catch (err: any) {
+      toast.error("Không thể thêm khoản thu: " + err.message);
+      throw err;
+    }
   };
 
   const editPaymentType = async (p: PaymentType) => {
-    const resp = await PaymentTypeService.updatePaymentType(p);
-    setPaymentTypes((prev) =>
-      prev.map((item) => (item.id === p.id ? resp.data.data.paymentType : item))
-    );
-    toast.success("Cập nhật khoản thu thành công");
+    try {
+      const resp = await PaymentTypeService.updatePaymentType(p);
+      setPaymentTypes((prev) =>
+        prev.map((item) =>
+          item.id === p.id ? resp.data.data.paymentType : item
+        )
+      );
+      toast.success("Cập nhật khoản thu thành công");
+    } catch (err: any) {
+      toast.error("Không thể cập nhật khoản thu: " + err.message);
+      throw err;
+    }
   };
 
   const deletePaymentType = async (id: string) => {
-    await PaymentTypeService.deletePaymentType(id);
-    setPaymentTypes((prev) => prev.filter((p) => p.id !== id));
-    toast.success("Đã xóa khoản thu");
+    try {
+      await PaymentTypeService.deletePaymentType(id);
+      setPaymentTypes((prev) => prev.filter((p) => p.id !== id));
+      toast.success("Đã xóa khoản thu");
+    } catch (err: any) {
+      toast.error("Không thể xóa khoản thu: " + err.message);
+      throw err;
+    }
   };
 
   const addPayment = async (data: HouseholdPayment) => {
-    const resp = await HouseholdPaymentService.addHouseholdPayment(data);
-    setPayments((prev) => [...prev, resp.data.data.payment]);
-    toast.success("Thêm thanh toán thành công");
+    try {
+      const resp = await HouseholdPaymentService.addHouseholdPayment(data);
+      setPayments((prev) => [...prev, resp.data.data.payment]);
+      toast.success("Thêm thanh toán thành công");
+    } catch (err: any) {
+      toast.error("Không thể thêm thanh toán: " + err.message);
+      throw err;
+    }
   };
 
   const editPayment = async (data: HouseholdPayment) => {
-    const resp = await HouseholdPaymentService.updateHouseholdPayment(data);
-    setPayments((prev) =>
-      prev.map((p) => (p.id === data.id ? resp.data.data.payment : p))
-    );
-    toast.success("Cập nhật thanh toán thành công");
+    try {
+      const resp = await HouseholdPaymentService.updateHouseholdPayment(data);
+      setPayments((prev) =>
+        prev.map((p) => (p.id === data.id ? resp.data.data.payment : p))
+      );
+      toast.success("Cập nhật thanh toán thành công");
+    } catch (err: any) {
+      toast.error("Không thể cập nhật thanh toán: " + err.message);
+      throw err;
+    }
   };
 
   const deletePayment = async (id: string) => {
-    await HouseholdPaymentService.deleteHouseholdPayment(id);
-    setPayments((prev) => prev.filter((p) => p.id !== id));
-    toast.success("Đã xóa thanh toán");
+    try {
+      await HouseholdPaymentService.deleteHouseholdPayment(id);
+      setPayments((prev) => prev.filter((p) => p.id !== id));
+      toast.success("Đã xóa thanh toán");
+    } catch (err: any) {
+      toast.error("Không thể xóa thanh toán: " + err.message);
+      throw err;
+    }
   };
 
   // --- Computed States ---
