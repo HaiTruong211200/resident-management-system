@@ -51,9 +51,6 @@ export const FeePage: React.FC = () => {
   );
 
   const [currentPage, setCurrentPage] = useState(1);
-  // Campaigns pagination
-  const CAMPAIGNS_PER_PAGE = 6;
-  const [campaignPage, setCampaignPage] = useState(1);
   console.log({ paymentTypes });
 
   // Modal States
@@ -100,11 +97,6 @@ export const FeePage: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedCampaignId, selectedStatus, paymentCategoryTab, activeTab]);
-
-  // Reset campaigns page when displayed list or tab changes
-  useEffect(() => {
-    setCampaignPage(1);
-  }, [displayedPaymentTypes, activeTab]);
 
   // Payment Logic
   const handlePaymentHouseholdChange = (hid: string) => {
