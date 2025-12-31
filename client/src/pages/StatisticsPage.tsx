@@ -37,7 +37,9 @@ export const StatisticsPage: React.FC = () => {
       try {
         setLoading(true);
         // Always force refresh statistics when entering this page
-        const data = await StatisticsService.getDashboardStatistics({ force: true });
+        const data = await StatisticsService.getDashboardStatistics({
+          force: true,
+        });
         if (!mounted) return;
         setStatistics(data);
         setError(null);
@@ -121,10 +123,26 @@ export const StatisticsPage: React.FC = () => {
     ];
   }, [statistics]);
 
-  const feeData = useMemo<MonthlyCollection[]>(
-    () => statistics?.monthlyCollection || [],
-    [statistics]
-  );
+  const feeData = useMemo<MonthlyCollection[]>(() => {
+    if (!statistics) return [];
+
+    // New server endpoint may return `monthlyAggregation` with shape { month: 'YYYY-MM', fees, funds, totalCollected }
+    const src =
+      (statistics as any).monthlyAggregation || statistics.monthlyCollection;
+    if (!src || !Array.isArray(src)) return [];
+
+    // Map to MonthlyCollection shape expected by the chart
+    const mapped: MonthlyCollection[] = src.map((m: any) => ({
+      month: m.month,
+      fees: m.fees ?? m.totalFees ?? 0,
+      funds: m.funds ?? m.totalFunds ?? 0,
+      total: m.total ?? m.totalCollected ?? (m.fees ?? 0) + (m.funds ?? 0),
+    }));
+
+    // Ensure sorted by month ascending
+    mapped.sort((a, b) => (a.month > b.month ? 1 : a.month < b.month ? -1 : 0));
+    return mapped;
+  }, [statistics]);
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -204,8 +222,9 @@ export const StatisticsPage: React.FC = () => {
             <div className="space-y-6">
               {ageChartData.map((item, index) => {
                 const total = ageChartData.reduce((sum, d) => sum + d.count, 0);
-                const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
-                
+                const percentage =
+                  total > 0 ? Math.round((item.count / total) * 100) : 0;
+
                 return (
                   <div key={index} className="flex items-center gap-4">
                     <div className="w-40 text-sm font-medium text-slate-700">
@@ -242,21 +261,25 @@ export const StatisticsPage: React.FC = () => {
             <div className="flex gap-6 mb-8">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-1 bg-green-500 rounded"></div>
-                <span className="text-sm font-medium text-slate-700">Tổng thu phí</span>
+                <span className="text-sm font-medium text-slate-700">
+                  Tổng thu phí
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-1 bg-orange-500 rounded"></div>
-                <span className="text-sm font-medium text-slate-700">Tổng thu quỹ</span>
+                <span className="text-sm font-medium text-slate-700">
+                  Tổng thu quỹ
+                </span>
               </div>
             </div>
             {feeData.length > 0 && (
-              <div className="relative w-full" style={{ height: '400px' }}>
+              <div className="relative w-full" style={{ height: "400px" }}>
                 <canvas
                   id="lineChart"
                   ref={(canvas) => {
                     if (!canvas || feeData.length === 0) return;
-                    
-                    const ctx = canvas.getContext('2d');
+
+                    const ctx = canvas.getContext("2d");
                     if (!ctx) return;
 
                     // Set canvas size
@@ -270,22 +293,31 @@ export const StatisticsPage: React.FC = () => {
 
                     // Find max value
                     const maxValue = Math.max(
-                      ...feeData.map(d => Math.max(d.fees || 0, d.funds || 0))
+                      ...feeData.map((d) => Math.max(d.fees || 0, d.funds || 0))
                     );
 
                     // Helper functions
-                    const getX = (index: number) => padding + (index / (feeData.length - 1)) * chartWidth;
-                    const getY = (value: number) => canvas.height - padding - (value / maxValue) * chartHeight;
+                    const getX = (index: number) =>
+                      padding + (index / (feeData.length - 1)) * chartWidth;
+                    const getY = (value: number) =>
+                      canvas.height -
+                      padding -
+                      (value / maxValue) * chartHeight;
 
                     // Clear canvas with gradient background
-                    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-                    gradient.addColorStop(0, '#faf5f0');
-                    gradient.addColorStop(1, '#fef3c7');
+                    const gradient = ctx.createLinearGradient(
+                      0,
+                      0,
+                      0,
+                      canvas.height
+                    );
+                    gradient.addColorStop(0, "#faf5f0");
+                    gradient.addColorStop(1, "#fef3c7");
                     ctx.fillStyle = gradient;
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                     // Draw grid lines
-                    ctx.strokeStyle = '#fde68a';
+                    ctx.strokeStyle = "#fde68a";
                     ctx.lineWidth = 1;
                     for (let i = 0; i <= 4; i++) {
                       const y = padding + (chartHeight / 4) * i;
@@ -296,7 +328,7 @@ export const StatisticsPage: React.FC = () => {
                     }
 
                     // Draw axes
-                    ctx.strokeStyle = '#d97706';
+                    ctx.strokeStyle = "#d97706";
                     ctx.lineWidth = 2;
                     ctx.beginPath();
                     ctx.moveTo(padding, padding);
@@ -305,10 +337,10 @@ export const StatisticsPage: React.FC = () => {
                     ctx.stroke();
 
                     // Draw fees line
-                    ctx.strokeStyle = '#22c55e';
+                    ctx.strokeStyle = "#22c55e";
                     ctx.lineWidth = 3;
-                    ctx.lineJoin = 'round';
-                    ctx.lineCap = 'round';
+                    ctx.lineJoin = "round";
+                    ctx.lineCap = "round";
                     ctx.beginPath();
                     feeData.forEach((d, i) => {
                       const x = getX(i);
@@ -319,7 +351,7 @@ export const StatisticsPage: React.FC = () => {
                     ctx.stroke();
 
                     // Draw funds line
-                    ctx.strokeStyle = '#f97316';
+                    ctx.strokeStyle = "#f97316";
                     ctx.lineWidth = 3;
                     ctx.beginPath();
                     feeData.forEach((d, i) => {
@@ -331,7 +363,7 @@ export const StatisticsPage: React.FC = () => {
                     ctx.stroke();
 
                     // Draw dots for fees
-                    ctx.fillStyle = '#22c55e';
+                    ctx.fillStyle = "#22c55e";
                     feeData.forEach((d, i) => {
                       ctx.beginPath();
                       ctx.arc(getX(i), getY(d.fees || 0), 5, 0, Math.PI * 2);
@@ -339,7 +371,7 @@ export const StatisticsPage: React.FC = () => {
                     });
 
                     // Draw dots for funds
-                    ctx.fillStyle = '#f97316';
+                    ctx.fillStyle = "#f97316";
                     feeData.forEach((d, i) => {
                       ctx.beginPath();
                       ctx.arc(getX(i), getY(d.funds || 0), 5, 0, Math.PI * 2);
@@ -347,19 +379,23 @@ export const StatisticsPage: React.FC = () => {
                     });
 
                     // Draw X-axis labels
-                    ctx.fillStyle = '#475569';
-                    ctx.font = '12px sans-serif';
-                    ctx.textAlign = 'center';
+                    ctx.fillStyle = "#475569";
+                    ctx.font = "12px sans-serif";
+                    ctx.textAlign = "center";
                     feeData.forEach((d, i) => {
-                      ctx.fillText(d.month, getX(i), canvas.height - padding + 25);
+                      ctx.fillText(
+                        d.month,
+                        getX(i),
+                        canvas.height - padding + 25
+                      );
                     });
 
                     // Draw Y-axis labels
-                    ctx.textAlign = 'right';
+                    ctx.textAlign = "right";
                     for (let i = 0; i <= 4; i++) {
                       const value = (maxValue / 4) * i;
                       const y = canvas.height - padding - (chartHeight / 4) * i;
-                      const label = (value / 1000).toFixed(0) + 'K';
+                      const label = (value / 1000).toFixed(0) + "K";
                       ctx.fillText(label, padding - 10, y + 4);
                     }
                   }}

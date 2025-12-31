@@ -41,6 +41,7 @@ export const FeePage: React.FC = () => {
     addPayment,
     editPayment,
     deletePayment,
+    refreshData,
   } = useAppContext();
   const [activeTab, setActiveTab] = useState<"CAMPAIGNS" | "PAYMENTS">(
     "PAYMENTS"
@@ -50,6 +51,9 @@ export const FeePage: React.FC = () => {
   );
 
   const [currentPage, setCurrentPage] = useState(1);
+  // Campaigns pagination
+  const CAMPAIGNS_PER_PAGE = 6;
+  const [campaignPage, setCampaignPage] = useState(1);
   console.log({ paymentTypes });
 
   // Modal States
@@ -96,6 +100,11 @@ export const FeePage: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedCampaignId, selectedStatus, paymentCategoryTab, activeTab]);
+
+  // Reset campaigns page when displayed list or tab changes
+  useEffect(() => {
+    setCampaignPage(1);
+  }, [displayedPaymentTypes, activeTab]);
 
   // Payment Logic
   const handlePaymentHouseholdChange = (hid: string) => {
@@ -717,21 +726,29 @@ export const FeePage: React.FC = () => {
             </div>
 
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                if (editingCampaign) {
-                  editPaymentType({
-                    ...editingCampaign,
-                    ...newCampaign,
-                  } as PaymentType);
-                } else {
-                  addPaymentType({
-                    ...newCampaign,
-                    dateCreated: new Date().toISOString(),
-                    canEdit: true,
-                  } as PaymentType);
+                try {
+                  if (editingCampaign) {
+                    await editPaymentType({
+                      ...editingCampaign,
+                      ...newCampaign,
+                    } as PaymentType);
+                  } else {
+                    await addPaymentType({
+                      ...newCampaign,
+                      dateCreated: new Date().toISOString(),
+                      canEdit: true,
+                    } as PaymentType);
+                    // backend may create invoices/payments when a campaign is created
+                    // refresh global data to pick up newly created payments
+                    if (refreshData) await refreshData();
+                  }
+                } catch (err) {
+                  console.error("Error saving campaign:", err);
+                } finally {
+                  setIsModalOpen(false);
                 }
-                setIsModalOpen(false);
               }}
               className="p-6 space-y-4"
             >

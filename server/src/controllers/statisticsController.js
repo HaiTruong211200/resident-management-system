@@ -120,9 +120,12 @@ async function getDashboardStatistics(req, res) {
       const today = new Date();
       let age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
-      
+
       // Nếu chưa qua sinh nhật trong năm nay thì trừ 1 tuổi
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      if (
+        monthDiff < 0 ||
+        (monthDiff === 0 && today.getDate() < birthDate.getDate())
+      ) {
         age--;
       }
 
@@ -168,7 +171,7 @@ async function getPaymentTypeStatistics(req, res) {
       supabase.from("paymentTypes").select("*"),
       supabase
         .from("householdPayments")
-        .select("amountPaid, status, paymentTypeId"),
+        .select("amountPaid, status, paymentTypeId, paymentDate"),
     ]);
 
     if (typesRes.error) throw typesRes.error;
@@ -192,6 +195,12 @@ async function getPaymentTypeStatistics(req, res) {
       };
     });
 
+    // Build a helper map from paymentTypeId -> type label (e.g. 'Bắt buộc' | 'Tự nguyện')
+    const paymentTypeMap = {};
+    typesRes.data.forEach((pt) => {
+      paymentTypeMap[pt.paymentTypeId] = pt.type;
+    });
+
     // Loop 1 lần duy nhất qua bảng Payments (O(n)) thay vì Loop lồng nhau (O(n*m))
     paymentsRes.data.forEach((p) => {
       const stats = statsMap[p.paymentTypeId];
@@ -206,7 +215,59 @@ async function getPaymentTypeStatistics(req, res) {
       }
     });
 
-    return sendSuccess(res, { statistics: Object.values(statsMap) });
+    // --- Monthly aggregation (group by paymentDate's YYYY-MM) ---
+    // Aggregate totals per month and split by payment `type` ("Bắt buộc" vs "Tự nguyện")
+    const monthlyMap = {};
+    paymentsRes.data.forEach((p) => {
+      if (!p.paymentDate) return; // skip if no date
+      const monthKey = String(p.paymentDate).substring(0, 7); // YYYY-MM
+      if (!monthlyMap[monthKey]) {
+        monthlyMap[monthKey] = {
+          month: monthKey,
+          totalCollected: 0,
+          totalPayments: 0,
+          fees: 0,
+          funds: 0,
+          byType: {},
+        };
+      }
+
+      const amt = parseFloat(p.amountPaid) || 0;
+      monthlyMap[monthKey].totalCollected += amt;
+      monthlyMap[monthKey].totalPayments++;
+
+      const pTypeLabel = paymentTypeMap[p.paymentTypeId];
+      if (pTypeLabel === "Bắt buộc") monthlyMap[monthKey].fees += amt;
+      else if (pTypeLabel === "Tự nguyện") monthlyMap[monthKey].funds += amt;
+
+      const typeId = p.paymentTypeId;
+      if (!monthlyMap[monthKey].byType[typeId]) {
+        monthlyMap[monthKey].byType[typeId] = {
+          paymentTypeId: typeId,
+          totalCollected: 0,
+          totalPayments: 0,
+        };
+      }
+      monthlyMap[monthKey].byType[typeId].totalCollected += amt;
+      monthlyMap[monthKey].byType[typeId].totalPayments++;
+    });
+
+    // Convert monthlyMap to sorted array (ascending by month)
+    const monthlyAggregation = Object.keys(monthlyMap)
+      .sort()
+      .map((k) => ({
+        month: k,
+        totalCollected: monthlyMap[k].totalCollected,
+        totalPayments: monthlyMap[k].totalPayments,
+        fees: monthlyMap[k].fees,
+        funds: monthlyMap[k].funds,
+        byType: Object.values(monthlyMap[k].byType),
+      }));
+
+    return sendSuccess(res, {
+      statistics: Object.values(statsMap),
+      monthlyAggregation,
+    });
   } catch (err) {
     console.error("Error fetching payment type statistics:", err);
     return sendError(res, {
